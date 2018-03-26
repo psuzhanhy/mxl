@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <vector>
 #include <sys/time.h>
 #include "matvec.h"
@@ -7,14 +8,14 @@
 #include "mxl.h"
 #include "mxl_gaussblockdiag.h"
 #include "rnggenerator.h"
-	
+
 MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
-							int numclass, int dim, bool zeroinit, 
-							int numdraws): 
-							MixedLogit(xf,lbl,numclass,dim), 
-							means(numclass, dim, zeroinit),
-							covCholeskey(numclass, dim, zeroinit),
-							R(numdraws)
+		int numclass, int dim, bool zeroinit, 
+		int numdraws): 
+		MixedLogit(xf,lbl,numclass,dim), 
+		means(numclass, dim, zeroinit),
+		covCholeskey(numclass, dim, zeroinit),
+		R(numdraws)
 {
 	/*	
 	*	ctor for MxlGaussianBlockDiag class
@@ -36,8 +37,6 @@ MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 	} 
 	else
 	{				
-		//boost::random::uniform_real_distribution<> unid(0, 1);
-		//boost::variate_generator<boost::mt19937&,boost::random::uniform_real_distribution<> > unid_init(rng, unid);
 		for(int k=0; k<this->numClass; k++)				
 			this->classConstants.push_back(RngGenerator::unid_init());
 	}
@@ -45,31 +44,42 @@ MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 
 
 
-std::vector<double> MxlGaussianBlockDiag::propensityFunction(int sampleID, 
-															std::vector<double> normalDraws) 
+void MxlGaussianBlockDiag::propensityFunction(int sampleID, 
+		const std::vector<double> &normalDraws,
+		std::vector<double> &classPropensity) 
 {
 	/*
-	* compute propensity score for observation sampleID, and simulated random normal draw
+	* compute propensity score for observation sampleID, and simulated 
+	random normal draw
+	
+	@param: std::vector<double> normalDraws: vector of length numClass * dimension * R
+	@return: std::vector<double> classPropensity: vector of length R * numClass
+		group by each simulation [(c1,r1) .. (C,r1) | ... | (c1,R)...(C,R)]
 	*/
-	    	
-	std::vector<double> classPropensity;	  //length: numClass
+	std::vector<double> meanPropensity(this->numClass); 
 	for(int k=0; k<this->numClass; k++)
+		meanPropensity[k] = this->xfeature.rowInnerProduct(this->means.meanVectors[k],
+					this->means.dimension, sampleID);
+
+	for(int r=0; r<this->R; r++)
 	{
-		double meanPropensity = this->xfeature.rowInnerProduct(this->means.meanVectors[k],
-								this->means.dimension, sampleID);
-		std::vector<double> classdraws;
-		for(int i=0; i<this->dimension; i++)
-			classdraws.push_back(normalDraws[k*this->dimension+i]);
-		double randomPropensity = this->covCholeskey.factorArray[k].quadraticForm(this->xfeature, 
-							 	sampleID, classdraws, this->dimension);
-        classPropensity.push_back(meanPropensity+randomPropensity+classConstants[k]);
-	}
-	return classPropensity;
+		for(int k=0; k<this->numClass; k++)
+		{
+			int start = r * this->numClass * this->dimension + k * this->dimension;
+			int end = start + this->dimension - 1;
+
+			double randomPropensity = this->covCholeskey.factorArray[k].quadraticForm(this->xfeature, 
+					sampleID, normalDraws,start,end);
+
+			classPropensity[r*this->numClass+k] = meanPropensity[k]+randomPropensity+classConstants[k];
+		}
+	}	
 }
 
 
-
-std::vector<double> MxlGaussianBlockDiag::multinomialProb(std::vector<double> propensityScore)
+void MxlGaussianBlockDiag::multinomialProb(
+		const std::vector<double> &propensityScore, 
+		std::vector<double> &mnProb)
 {
 	/*
 	 * compute multinomial probabilities
@@ -84,62 +94,196 @@ std::vector<double> MxlGaussianBlockDiag::multinomialProb(std::vector<double> pr
     }
 
     double sumProb = 0;
-    for(int i=0; i<this->numClass; i++)
-    {
-        propensityScore[i] -= maxscore; // avoid overfloat
-        propensityScore[i] = exp(propensityScore[i]);
-        sumProb += propensityScore[i];
-    }
-	std::vector<double> classProb;
-    for(int i=0; i<numClass; i++)
-        classProb.push_back(propensityScore[i]/sumProb);
- 
-	return classProb;
+    for(int k=0; k<this->numClass; k++)
+        sumProb += exp(propensityScore[k]-maxscore);
+   
+    for(int k=0; k<this->numClass; k++)
+        mnProb[k] = exp(propensityScore[k]-maxscore)/sumProb;
 }
 
 
 
-/*
-void Stochastic_SAA_MultinomialProb_MLogitGBDCov (ClassMeans Means , BlockCholeskey  CovFactors , double *ClassConstants, CSR_matrix xfeature, int sampleID ,double *NormalDraws ,int R, double *Random_ClassProb)
+
+
+void MxlGaussianBlockDiag::simulatedProbability(int sampleID, const std::vector<double> &normalrv, std::vector<double> &simProb)
 {
-    
-    double *ClassMeanPropensity;
-    ClassMeanPropensity = (double *) malloc( sizeof(double) * Means.NumClass);
-    for(int k=0 ;k<Means.NumClass;k++)
-    {
-        ClassMeanPropensity[k] = rowInnerProduct( Means.MeanVectors[k] , Means.Dimension , xfeature , sampleID );
-        //std::cout << ClassMeanPropensity[k] << " ";
-    }
-    
-    double *ClassCovPropensity; //R-by-NumClass
-    ClassCovPropensity = (double *) malloc( sizeof(double) * R * CovFactors.NumClass);
-    for(int r=0 ; r<R ; r++ )
-    {   
-//        ClassCovPropensity[r] = (double *) malloc(sizeof(double) * CovFactors.NumClass);
-        for(int k=0 ; k<CovFactors.NumClass ; k++)
-        {
-            ClassCovPropensity[r*CovFactors.NumClass+k] =quadraticForm(xfeature, sampleID , &NormalDraws[r*CovFactors.NumClass*CovFactors.Dimension+k*CovFactors.Dimension], CovFactors.Dimension , CovFactors.FactorArray[k] );
-            //std::cout <<  ClassCovPropensity[r][k] << " ";
-        }
-        //std::cout << std::endl;
-    }
+	/*
+	*	return a vector of length (R * numClass) of the 
+	*	simulated probabilities for each class
+	* 	@param:
+	*		sampleID: computing the simulated probabilities of (R * numClass) for sampleID
+	*		simProb:  empty vector, populated and return by the function
+	*/
 
-    double *ClassTotalPropensity;
-    ClassTotalPropensity = (double *) malloc( sizeof(double) * Means.NumClass);
-    for(int r=0 ;r<R ; r++)
-    {
-        for(int k=0; k<Means.NumClass; k++)
-            ClassTotalPropensity[k] = ClassMeanPropensity[k]+ClassCovPropensity[r*CovFactors.NumClass+k]+ClassConstants[k];
-        multinomialProb( ClassTotalPropensity, CovFactors.NumClass , &Random_ClassProb[r*Means.NumClass] );
-    }
+	// length R * numClass
+	std::vector<double> propensityScore(this->numClass * this->R);
+	this->propensityFunction(sampleID, normalrv, propensityScore); 	
+ 	for(int r=0; r<this->R; r++)
+	{
+		double maxscore = propensityScore[r*this->numClass];
+		for(int k=0; k<this->numClass; k++)
+		{
+			if (propensityScore[r*this->numClass+k] > maxscore)  
+				maxscore = propensityScore[r*this->numClass+k];
+		}
 
-    free(ClassMeanPropensity);
-//    for(int r=0; r<R; r++)
-//        free(ClassCovPropensity[r]);
-    free(ClassCovPropensity);
-    free(ClassTotalPropensity);
+	    double sumProb = 0;
+	    for(int k=0; k<this->numClass; k++)
+		{
+			propensityScore[r*this->numClass+k] -= maxscore;
+			propensityScore[r*this->numClass+k] = exp(propensityScore[r*this->numClass+k]);
+	        sumProb += propensityScore[r*this->numClass+k];
+	 	}	
 
+		for(int k=0; k<this->numClass; k++)
+			simProb[r*this->numClass+k] = propensityScore[r*this->numClass+k]/sumProb;	
+
+	}
 }
 
-*/
+
+
+void MxlGaussianBlockDiag::simulatedProbability_inline(int sampleID, std::vector<double> &simProb)
+{
+
+	// generate normal(0,1) vector 
+	RngGenerator::var_nor.engine().seed(sampleID);
+	RngGenerator::var_nor.distribution().reset(); 
+
+	std::vector<double> meanPropensity(this->numClass); 
+	for(int k=0; k<this->numClass; k++)
+		meanPropensity[k] = this->xfeature.rowInnerProduct(this->means.meanVectors[k],
+					this->means.dimension, sampleID);
+
+	std::vector<double> propensityScore(this->numClass);
+	int rvdim = this->numClass * this->dimension; 
+	std::vector<double> normalrv(rvdim);
+	for(int r=0; r<this->R; r++)
+	{
+		// random draws
+		for(int i=0; i<rvdim; i++)
+			normalrv[i] = RngGenerator::var_nor();	
+
+		for(int k=0; k<this->numClass; k++)
+		{
+			int start = k * this->dimension;
+			int end = start + this->dimension - 1;
+
+			double randomPropensity = this->covCholeskey.factorArray[k].quadraticForm(this->xfeature, 
+					sampleID, normalrv,start,end);
+
+			propensityScore[k] = meanPropensity[k]+randomPropensity+classConstants[k];
+		}
+			
+		double maxscore = propensityScore[0];
+		for(int k=0; k<this->numClass; k++)
+		{
+			if (propensityScore[k] > maxscore)  
+				maxscore = propensityScore[k];
+		}
+
+	    double sumProb = 0;
+	    for(int k=0; k<this->numClass; k++)
+		{
+			propensityScore[k] -= maxscore;
+			propensityScore[k] = exp(propensityScore[k]);
+	        sumProb += propensityScore[k];
+	 	}	
+
+		for(int k=0; k<this->numClass; k++)
+			simProb[r*this->numClass+k] = propensityScore[k]/sumProb;	
+	}	
+}// MxlGaussianBlockDiag::simulatedProbability_inline
+
+
+
+double MxlGaussianBlockDiag::negativeLogLik() 
+{
+	double nll = 0;
+	int rvdim = this->numClass * this->R * this->dimension; 
+	std::vector<double> normalrv(rvdim);
+
+	for(int n=0; n<this->numSamples; n++)
+	{
+		// normal(0,1) draws for sampleID
+		RngGenerator::var_nor.engine().seed(n);
+		RngGenerator::var_nor.distribution().reset(); 
+		for(int i=0; i<rvdim; i++)
+			normalrv[i] = RngGenerator::var_nor();	
+
+		std::vector<double> probSim(this->R * this->numClass); 
+		this->simulatedProbability(n,normalrv, probSim);//populate probSim 
+
+		int lbl = this->label[n];
+		double probSAA = 0;
+		for(int r=0; r<this->R; r++)
+			probSAA += probSim[r*this->numClass+lbl];
+		nll += log(probSAA/this->R); 
+	}
+	return -nll;
+}
+
+
+void MxlGaussianBlockDiag::gradient(int sampleID, std::vector<double> &constantGrad, 
+		ClassMeans &meanGrad, BlockCholeskey &covGrad)
+{
+	// generate normal(0,1) vector 
+	RngGenerator::var_nor.engine().seed(sampleID);
+	RngGenerator::var_nor.distribution().reset(); 
+	int rvdim = this->numClass * this->R * this->dimension; 
+	std::vector<double> normalrv(rvdim);
+	// all random draws for sampleID
+	for(int i=0; i<rvdim; i++)
+		normalrv[i] = RngGenerator::var_nor();	
+
+	std::vector<double> probSim(this->R * this->numClass); 
+	this->simulatedProbability(sampleID,normalrv, probSim);//populate probSim 
+	// Sample Average Approximated Probability
+	double probSAA = 0;
+	for(auto val : probSim)		
+		probSAA += val;
+	probSAA /= this->R; 
+
+	std::vector<double> summationTerm(this->numClass,0.0);	
+	std::vector<double> summationDraws(this->numClass * this->dimension,0.0);
+	
+	int lbl = this->label[sampleID];
+	for(int k=0; k<this->numClass; k++)
+	{
+		double b;
+		for(int r=0 ; r<R ; r++)
+		{
+			if (k != lbl)
+			{
+				b = - probSim[r*this->numClass+k];
+			} else {
+				b = (1-probSim[r*this->numClass+k]);
+			}	
+			summationTerm[k] -= probSim[r*this->numClass+lbl] * b; 
+			for(int i=0 ; i<this->dimension ; i++)
+			   summationDraws[k*this->dimension+i] -= probSim[r*this->numClass+lbl] * b 
+					* normalrv[r*this->numClass*this->dimension+k*this->dimension+i];  
+		}
+
+		for(int i=0; i<this->dimension; i++)
+			summationDraws[k*this->dimension+i] /= (probSAA * this->R);
+
+        /* update gradient with respect to constant term */
+        constantGrad[k] += summationTerm[k] / (probSAA * this->R); 
+ 
+        /* update gradient with respect to mean */
+        for(int i= this->xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++)
+            meanGrad.meanVectors[k][xfeature.col[i]] += summationTerm[k]/(probSAA * this->R)
+ 														* xfeature.val[i];
+
+        /* update gradient with respect to Covariance Choleskey Factor */
+		int start = k * this->dimension;
+		int end = start + this->dimension - 1;
+        this->xfeature.rowOuterProduct2LowerTri(sampleID, 
+				summationDraws, start, end, 
+				covGrad.factorArray[k]);
+	}
+
+} // MxlGaussianBlockDiag::gradient
+
 

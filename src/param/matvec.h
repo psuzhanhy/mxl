@@ -20,10 +20,13 @@ struct CSR_matrix
  
 	~CSR_matrix(){}
 
-	double rowInnerProduct(std::vector<double> denseVec, int vecLength, int rowID); 
-	void rowOuterProduct2LowerTri(int rowID, std::vector<double> denseRightVec, 
-								  int rightVecLength, CSR_matrix *lowerTriCSR);
-	double quadraticForm(CSR_matrix leftMat, int rowID, std::vector<double> denseRightVec, int rightVecLength); 
+	double rowInnerProduct(const std::vector<double> &denseVec, int vecLength, int rowID);
+	
+	void rowOuterProduct2LowerTri(int rowID, const std::vector<double> &denseRightVec,
+			int start, int end, CSR_matrix &lowerTriCSR);	
+	
+	double quadraticForm(const CSR_matrix &leftMat, int rowID, 
+			const std::vector<double> &denseRightVec, int start, int end);
 };
 
 

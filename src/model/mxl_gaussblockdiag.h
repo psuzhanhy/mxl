@@ -15,29 +15,34 @@ class MxlGaussianBlockDiag : public MixedLogit
 		ClassMeans means;
 		BlockCholeskey covCholeskey;
 		std::vector<double> classConstants;
-		//boost::mt19937 rngseed; //seed for SAA
 		int R; //number of draws
+
 
 	public:
 		MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
-							int numclass, int dim, bool zeroinit, 
-							int numdraws);
+				int numclass, int dim, bool zeroinit, 
+				int numdraws);
 
-		std::vector<double> propensityFunction(int sampleID, 
-							std::vector<double> normalDraws);
+		double negativeLogLik();
 
-		//TODO: implement pure virtual in .cpp 
-		double negativeLogLik() { return 0.0; }
-		std::vector<double> multinomialProb(std::vector<double> propensityScore);
+		void propensityFunction(int sampleID, 
+			const std::vector<double> &normalDraws,
+			std::vector<double> &classPropensity);
 
-		BlockCholeskey getCovCholeskey() 
-		{
-			return this->covCholeskey;  
-		}
+		void multinomialProb(const std::vector<double> &propensityScore, 
+				std::vector<double> &mnProb);
+
+		void simulatedProbability(int sampleID, const std::vector<double> &normalrv, std::vector<double> &simProb);
+
+		void simulatedProbability_inline(int sampleID, std::vector<double> &simProb);
 
 
-		
-	
+		void gradient(int sampleID, std::vector<double> &constantGrad, 
+		ClassMeans &meanGrad, BlockCholeskey &covGrad);
+
+		BlockCholeskey getCovCholeskey() {return this->covCholeskey;}
+
+
 };
 
 #endif

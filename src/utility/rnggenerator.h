@@ -15,5 +15,12 @@ class RngGenerator
 		static boost::mt19937 rng;
 		static boost::random::uniform_real_distribution<> unid;
 		static boost::variate_generator<boost::mt19937&,boost::random::uniform_real_distribution<> > unid_init;
+
+	    static boost::normal_distribution<> nd;
+	    static boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > var_nor;
+	    //static var_nor.engine().seed(sampleID);
+	    //static var_nor.distribution().reset();
+
 };
+
 #endif

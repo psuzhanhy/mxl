@@ -20,11 +20,10 @@ int main(int argc, char **argv)
     input_filename = argv[optind];		
     ReadDenseInput(input_filename, &data);   
 	CSR_matrix xf = Dense2CSR(data);
-	//boost::mt19937 rng(time(nullptr));
 	MxlGaussianBlockDiag gmxl1 = MxlGaussianBlockDiag(xf, data.label,
-						 numclass, xf.number_cols, false, 100);
+						 numclass, xf.number_cols, false, 1000);
 
-
+	/*
 	MxlGaussianBlockDiag gmxl2 = MxlGaussianBlockDiag(xf, data.label,
 						 numclass, xf.number_cols, false, 100);
 
@@ -37,8 +36,17 @@ int main(int argc, char **argv)
 	} else {
 		std::cout << "not same \n";	
 	}
-		
+	*/	
+
+	//auto prob = gmxl1.simulatedProbability(0);
 	
+	//for(auto val : prob)
+	//	std::cout << val << std::endl;
+		
+	std::cout << "NLL: " << gmxl1.negativeLogLik() << std::endl;
+	//std::cout << "NLL: " << gmxl2.negativeLogLik() << std::endl;
+
+
 
 
 

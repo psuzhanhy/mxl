@@ -10,8 +10,6 @@
 
 BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(numclass, dim) 
 {
-	//boost::random::uniform_real_distribution<> unid(0, 1);
-	//boost::variate_generator<boost::mt19937&,boost::random::uniform_real_distribution<> > unid_init(rng, unid);
 	for(int i = 0; i <numClass ; i++)
 	{  
 		CSR_matrix factor; 
@@ -92,8 +90,6 @@ bool BlockCholeskey::operator== (BlockCholeskey const& bcholRHS)
 
 ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): MxLParam(numclass, dim)  
 {
-	//boost::uniform_real<> unid(0, 1);
-	//boost::variate_generator<boost::mt19937&,boost::uniform_real<> > unid_init(rng, unid);
 	std::vector<double> row;
 	for (int i=0; i<numClass; i++)
 	{
