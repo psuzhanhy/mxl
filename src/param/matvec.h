@@ -20,7 +20,10 @@ struct CSR_matrix
  
 	~CSR_matrix(){}
 
-	double rowInnerProduct(const std::vector<double> &denseVec, int vecLength, int rowID);
+	void setzero();
+
+	double rowInnerProduct(const std::vector<double> &denseVec, 
+			int vecLength, int rowID);
 	
 	void rowOuterProduct2LowerTri(int rowID, const std::vector<double> &denseRightVec,
 			int start, int end, CSR_matrix &lowerTriCSR);	

@@ -10,11 +10,14 @@
 #include "rnggenerator.h"
 
 MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
-		int numclass, int dim, bool zeroinit, 
-		int numdraws): 
+		int numclass, int dim, bool zeroinit, int numdraws): 
 		MixedLogit(xf,lbl,numclass,dim), 
 		means(numclass, dim, zeroinit),
 		covCholeskey(numclass, dim, zeroinit),
+		classConstants(numclass),
+		meanGrad(numclass, dim, true),
+		covGrad(numclass, dim, true),
+		constantGrad(numclass),
 		R(numdraws)
 {
 	/*	
@@ -33,12 +36,14 @@ MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 	if (zeroinit)
 	{
 		for(int k=0; k<this->numClass; k++)
-			this->classConstants.push_back(0);
+			this->classConstants[k] = 0;
 	} 
 	else
 	{				
 		for(int k=0; k<this->numClass; k++)				
-			this->classConstants.push_back(RngGenerator::unid_init());
+			this->classConstants[k] = RngGenerator::unid_init();
+		for(int k=0; k<this->numClass; k++)				
+			this->constantGrad[k] = 0;
 	}
 } 
 
@@ -105,7 +110,9 @@ void MxlGaussianBlockDiag::multinomialProb(
 
 
 
-void MxlGaussianBlockDiag::simulatedProbability(int sampleID, const std::vector<double> &normalrv, std::vector<double> &simProb)
+void MxlGaussianBlockDiag::simulatedProbability(int sampleID, 
+		const std::vector<double> &normalrv, 
+		std::vector<double> &simProb)
 {
 	/*
 	*	return a vector of length (R * numClass) of the 
@@ -224,8 +231,7 @@ double MxlGaussianBlockDiag::negativeLogLik()
 }
 
 
-void MxlGaussianBlockDiag::gradient(int sampleID, std::vector<double> &constantGrad, 
-		ClassMeans &meanGrad, BlockCholeskey &covGrad)
+void MxlGaussianBlockDiag::gradient(int sampleID)
 {
 	// generate normal(0,1) vector 
 	RngGenerator::var_nor.engine().seed(sampleID);
@@ -269,21 +275,42 @@ void MxlGaussianBlockDiag::gradient(int sampleID, std::vector<double> &constantG
 			summationDraws[k*this->dimension+i] /= (probSAA * this->R);
 
         /* update gradient with respect to constant term */
-        constantGrad[k] += summationTerm[k] / (probSAA * this->R); 
+        this->constantGrad[k] += summationTerm[k] / (probSAA * this->R); 
  
         /* update gradient with respect to mean */
         for(int i= this->xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++)
-            meanGrad.meanVectors[k][xfeature.col[i]] += summationTerm[k]/(probSAA * this->R)
- 														* xfeature.val[i];
+            this->meanGrad.meanVectors[k][xfeature.col[i]] += summationTerm[k]/(probSAA * this->R)
+ 					* xfeature.val[i];
 
         /* update gradient with respect to Covariance Choleskey Factor */
 		int start = k * this->dimension;
 		int end = start + this->dimension - 1;
         this->xfeature.rowOuterProduct2LowerTri(sampleID, 
 				summationDraws, start, end, 
-				covGrad.factorArray[k]);
+				this->covGrad.factorArray[k]);
 	}
 
 } // MxlGaussianBlockDiag::gradient
+
+
+void MxlGaussianBlockDiag::sgdupdate(int sampleID, double stepsize)
+{
+	this->meanGrad.setzero();
+	this->covGrad.setzero();
+	for(int k=0; k<this->numClass; k++)
+		constantGrad[k] = 0;
+
+	this->gradient(sampleID);
+
+	this->meanGrad *= stepsize;	
+	this->means += this->meanGrad;	
+
+	this->covGrad *= stepsize;
+	this->covCholeskey += this->covGrad;
+
+	for(int k=0; k<this->numClass; k++)
+		classConstants[k] += stepsize * constantGrad[k];		
+}
+
 
 

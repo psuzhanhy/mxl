@@ -15,33 +15,39 @@ class MxlGaussianBlockDiag : public MixedLogit
 		ClassMeans means;
 		BlockCholeskey covCholeskey;
 		std::vector<double> classConstants;
+
+		ClassMeans meanGrad;
+		BlockCholeskey covGrad;
+		std::vector<double> constantGrad;
+		
 		int R; //number of draws
 
 
 	public:
 		MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
-				int numclass, int dim, bool zeroinit, 
-				int numdraws);
+				int numclass, int dim, bool zeroinit,int numdraws);
 
 		double negativeLogLik();
 
 		void propensityFunction(int sampleID, 
-			const std::vector<double> &normalDraws,
-			std::vector<double> &classPropensity);
+				const std::vector<double> &normalDraws,
+				std::vector<double> &classPropensity);
 
 		void multinomialProb(const std::vector<double> &propensityScore, 
 				std::vector<double> &mnProb);
 
-		void simulatedProbability(int sampleID, const std::vector<double> &normalrv, std::vector<double> &simProb);
+		void simulatedProbability(int sampleID, 
+				const std::vector<double> &normalrv, 
+				std::vector<double> &simProb);
 
-		void simulatedProbability_inline(int sampleID, std::vector<double> &simProb);
+		void simulatedProbability_inline(int sampleID, 
+				std::vector<double> &simProb);
 
+		void gradient(int sampleID);
 
-		void gradient(int sampleID, std::vector<double> &constantGrad, 
-		ClassMeans &meanGrad, BlockCholeskey &covGrad);
-
+		void sgdupdate(int sampleID, double stepsize);
+				
 		BlockCholeskey getCovCholeskey() {return this->covCholeskey;}
-
 
 };
 

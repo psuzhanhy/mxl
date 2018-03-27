@@ -48,7 +48,14 @@ BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(n
 }
 
 
-BlockCholeskey& BlockCholeskey::operator+= (BlockCholeskey const& bcholRHS)
+void BlockCholeskey::setzero()
+{
+	for(int k=0; k<this->numClass; k++)
+		this->factorArray[k].setzero();	
+}
+
+
+BlockCholeskey& BlockCholeskey::operator+= (BlockCholeskey const &bcholRHS)
 {
 	try{
 		if (this->numClass != bcholRHS.numClass)
@@ -68,7 +75,19 @@ BlockCholeskey& BlockCholeskey::operator+= (BlockCholeskey const& bcholRHS)
 }
 
 
-bool BlockCholeskey::operator== (BlockCholeskey const& bcholRHS)
+BlockCholeskey& BlockCholeskey::operator*= (double scalar)
+{
+	for(int k=0; k<this->numClass; k++)
+	{
+		for(int i=0; i<this->factorArray[k].nnz ; i++)
+			this->factorArray[k].val[i] *= scalar;
+	}
+	
+	return *this;
+}
+
+
+bool BlockCholeskey::operator== (BlockCholeskey const &bcholRHS)
 {
 	if (this->numClass != bcholRHS.numClass)
 		return false;
@@ -107,8 +126,17 @@ ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): MxLParam(numclass,
 	} 
 }
 
+void ClassMeans::setzero()
+{
+	for(int k=0; k<this->numClass; k++)
+	{
+		for(int i=0; i<this->meanVectors[k].size(); i++)
+			this->meanVectors[k][i] = 0;
+	}
+}
 
-ClassMeans& ClassMeans::operator+= (ClassMeans const& clmsRHS)
+
+ClassMeans& ClassMeans::operator+= (ClassMeans const &clmsRHS)
 {
 	try{
 		if (this->numClass != clmsRHS.numClass)
@@ -123,6 +151,18 @@ ClassMeans& ClassMeans::operator+= (ClassMeans const& clmsRHS)
 	{
 		for(int j=0; j<this->dimension; j++)
 			this->meanVectors[k][j] += clmsRHS.meanVectors[k][j];
+	}
+
+	return *this;
+}
+
+
+ClassMeans& ClassMeans::operator*= (double scalar)
+{
+	for(int k=0; k<this->numClass; k++)
+	{
+		for(int j=0; j<this->dimension; j++)
+			this->meanVectors[k][j] *= scalar;
 	}
 
 	return *this;

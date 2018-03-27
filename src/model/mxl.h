@@ -24,6 +24,9 @@ class MixedLogit
 		{ numSamples = xf.number_rows; } 
 
 		virtual double negativeLogLik() = 0;
+		
+		virtual void sgdupdate(int sampleID, double stepsize) = 0;		
+
 		virtual ~MixedLogit() {}
 		 	
 };

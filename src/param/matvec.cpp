@@ -4,7 +4,8 @@
 #include "matvec.h"
 
 
-double CSR_matrix::rowInnerProduct(const std::vector<double> &denseVec, int vecLength, int rowID) 
+double CSR_matrix::rowInnerProduct(const std::vector<double> &denseVec, 
+		int vecLength, int rowID) 
 {
 	/*
 	multiplying a row in a CSR matrix with a dense vector
@@ -25,8 +26,9 @@ double CSR_matrix::rowInnerProduct(const std::vector<double> &denseVec, int vecL
 }
 
 
-void CSR_matrix::rowOuterProduct2LowerTri(int rowID, const std::vector<double> &denseRightVec,
-										  int start, int end, CSR_matrix &lowerTriCSR) 
+void CSR_matrix::rowOuterProduct2LowerTri(int rowID, 
+		const std::vector<double> &denseRightVec,
+		int start, int end, CSR_matrix &lowerTriCSR) 
 {
 	/*
 	TODO: improve generality
@@ -96,3 +98,8 @@ double CSR_matrix::quadraticForm(const CSR_matrix &leftMat, int rowID,
 }
 
 
+void CSR_matrix::setzero()
+{
+	for(int i=0; i<this->val.size(); i++)
+		this->val[i] = 0.0;
+}
