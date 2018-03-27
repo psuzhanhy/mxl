@@ -129,10 +129,8 @@ ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): MxLParam(numclass,
 void ClassMeans::setzero()
 {
 	for(int k=0; k<this->numClass; k++)
-	{
-		for(int i=0; i<this->meanVectors[k].size(); i++)
-			this->meanVectors[k][i] = 0;
-	}
+		std::fill(this->meanVectors[k].begin(), 
+			this->meanVectors[k].end(), 0.0);
 }
 
 

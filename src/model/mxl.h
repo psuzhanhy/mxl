@@ -25,8 +25,6 @@ class MixedLogit
 
 		virtual double negativeLogLik() = 0;
 		
-		virtual void sgdupdate(int sampleID, double stepsize) = 0;		
-
 		virtual ~MixedLogit() {}
 		 	
 };

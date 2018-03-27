@@ -3,6 +3,9 @@
 #include <math.h>
 #include <vector>
 #include <sys/time.h>
+#include <boost/random.hpp>
+#include <boost/random/normal_distribution.hpp>
+#include <boost/generator_iterator.hpp>
 #include "matvec.h"
 #include "param.h"
 #include "mxl.h"
@@ -15,9 +18,6 @@ MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 		means(numclass, dim, zeroinit),
 		covCholeskey(numclass, dim, zeroinit),
 		classConstants(numclass),
-		meanGrad(numclass, dim, true),
-		covGrad(numclass, dim, true),
-		constantGrad(numclass),
 		R(numdraws)
 {
 	/*	
@@ -42,8 +42,6 @@ MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 	{				
 		for(int k=0; k<this->numClass; k++)				
 			this->classConstants[k] = RngGenerator::unid_init();
-		for(int k=0; k<this->numClass; k++)				
-			this->constantGrad[k] = 0;
 	}
 } 
 
@@ -105,8 +103,6 @@ void MxlGaussianBlockDiag::multinomialProb(
     for(int k=0; k<this->numClass; k++)
         mnProb[k] = exp(propensityScore[k]-maxscore)/sumProb;
 }
-
-
 
 
 
@@ -231,7 +227,10 @@ double MxlGaussianBlockDiag::negativeLogLik()
 }
 
 
-void MxlGaussianBlockDiag::gradient(int sampleID)
+void MxlGaussianBlockDiag::gradient(int sampleID, 
+		std::vector<double> &constantGrad,
+		ClassMeans &meanGrad, 
+		BlockCholeskey &covGrad)
 {
 	// generate normal(0,1) vector 
 	RngGenerator::var_nor.engine().seed(sampleID);
@@ -275,11 +274,11 @@ void MxlGaussianBlockDiag::gradient(int sampleID)
 			summationDraws[k*this->dimension+i] /= (probSAA * this->R);
 
         /* update gradient with respect to constant term */
-        this->constantGrad[k] += summationTerm[k] / (probSAA * this->R); 
+        constantGrad[k] += summationTerm[k] / (probSAA * this->R); 
  
         /* update gradient with respect to mean */
         for(int i= this->xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++)
-            this->meanGrad.meanVectors[k][xfeature.col[i]] += summationTerm[k]/(probSAA * this->R)
+            meanGrad.meanVectors[k][xfeature.col[i]] += summationTerm[k]/(probSAA * this->R)
  					* xfeature.val[i];
 
         /* update gradient with respect to Covariance Choleskey Factor */
@@ -287,30 +286,51 @@ void MxlGaussianBlockDiag::gradient(int sampleID)
 		int end = start + this->dimension - 1;
         this->xfeature.rowOuterProduct2LowerTri(sampleID, 
 				summationDraws, start, end, 
-				this->covGrad.factorArray[k]);
+				covGrad.factorArray[k]);
 	}
 
 } // MxlGaussianBlockDiag::gradient
 
 
-void MxlGaussianBlockDiag::sgdupdate(int sampleID, double stepsize)
+void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 {
-	this->meanGrad.setzero();
-	this->covGrad.setzero();
-	for(int k=0; k<this->numClass; k++)
-		constantGrad[k] = 0;
+	/*
+	*	fit Sample Average Approximated marginal log-likelihood with SGD 
+	*/
 
-	this->gradient(sampleID);
+	boost::uniform_int<> unid_discrete(0, this->numSamples-1);
+    boost::variate_generator<boost::mt19937&,boost::uniform_int<> > 
+			unid_sampler(RngGenerator::rng, unid_discrete);
 
-	this->meanGrad *= stepsize;	
-	this->means += this->meanGrad;	
+	ClassMeans meanGrad(this->numClass, this->dimension, true);
+	BlockCholeskey covGrad(this->numClass, this->dimension, true);
+	std::vector<double> constantGrad(this->numClass);
+	std::vector<double> ordering(this->numSamples);
+	
+	for(int t=0; t<maxEpochs; t++)
+	{
+		for(int n=0; n<this->numSamples; n++)
+			ordering[n] = unid_sampler();
+		
+		stepsize *= scalar;
+		for(int n=0; n<this->numSamples; n++)
+		{
+			std::fill(constantGrad.begin(), constantGrad.end(), 0.0);
+			covGrad.setzero();
+			meanGrad.setzero();
 
-	this->covGrad *= stepsize;
-	this->covCholeskey += this->covGrad;
-
-	for(int k=0; k<this->numClass; k++)
-		classConstants[k] += stepsize * constantGrad[k];		
+			this->gradient(n,constantGrad, meanGrad, covGrad);
+			// update mean
+			meanGrad *= stepsize;
+			this->means += meanGrad;
+			// update covariance
+			covGrad *= stepsize;
+			this->covCholeskey += covGrad;
+			// update constants
+			for(int k=0; k<this->numClass; k++)
+				classConstants[k] += stepsize * constantGrad[k];					
+		}	
+	}	
 }
-
 
 

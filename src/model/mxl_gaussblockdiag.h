@@ -16,10 +16,6 @@ class MxlGaussianBlockDiag : public MixedLogit
 		BlockCholeskey covCholeskey;
 		std::vector<double> classConstants;
 
-		ClassMeans meanGrad;
-		BlockCholeskey covGrad;
-		std::vector<double> constantGrad;
-		
 		int R; //number of draws
 
 
@@ -43,9 +39,10 @@ class MxlGaussianBlockDiag : public MixedLogit
 		void simulatedProbability_inline(int sampleID, 
 				std::vector<double> &simProb);
 
-		void gradient(int sampleID);
+		void gradient(int sampleID, std::vector<double> &constantGrad,
+				ClassMeans &meanGrad, BlockCholeskey &covGrad);
 
-		void sgdupdate(int sampleID, double stepsize);
+		void fit(double stepsize, double scalar, int maxEpochs);
 				
 		BlockCholeskey getCovCholeskey() {return this->covCholeskey;}
 

@@ -100,6 +100,5 @@ double CSR_matrix::quadraticForm(const CSR_matrix &leftMat, int rowID,
 
 void CSR_matrix::setzero()
 {
-	for(int i=0; i<this->val.size(); i++)
-		this->val[i] = 0.0;
+	std::fill(this->val.begin(), this->val.end(), 0);
 }
