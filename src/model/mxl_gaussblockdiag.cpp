@@ -322,15 +322,15 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 			this->gradient(n,constantGrad, meanGrad, covGrad);
 			// update mean
 			meanGrad *= stepsize;
-			this->means += meanGrad;
+			this->means -= meanGrad;
 			// update covariance
 			covGrad *= stepsize;
-			this->covCholeskey += covGrad;
+			this->covCholeskey -= covGrad;
 			// update constants
 			for(int k=0; k<this->numClass; k++)
-				classConstants[k] += stepsize * constantGrad[k];					
+				classConstants[k] -= stepsize * constantGrad[k];					
 		}	
 	}	
-}
+} //MxlGaussianBlockDiag::fit
 
 
