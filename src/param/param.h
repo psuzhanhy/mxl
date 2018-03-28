@@ -21,8 +21,8 @@ struct BlockCholeskey: public MxLParam
 	~BlockCholeskey(){}
 	void setzero();
 	double norm();
-	void operator-= (BlockCholeskey const& bcholRHS);
-	void operator*= (double scalar);
+	BlockCholeskey& operator-= (BlockCholeskey const& bcholRHS);
+	BlockCholeskey& operator*= (double scalar);
 	bool operator== (BlockCholeskey const& bcholRHS);
 	
 };
@@ -34,8 +34,8 @@ struct ClassMeans: public MxLParam
 	~ClassMeans() {}
 	void setzero();
 	double norm();
-	void operator-= (ClassMeans const& clmsRHS);
-	void operator*= (double scalar);
+	ClassMeans& operator-= (ClassMeans const& clmsRHS);
+	ClassMeans& operator*= (double scalar);
 
 };
 
