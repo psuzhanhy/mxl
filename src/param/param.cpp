@@ -61,7 +61,8 @@ double BlockCholeskey::norm()
 	for(int k=0; k<this->numClass; k++)
 	{
 		for(int i=0; i<this->factorArray[k].nnz; i++)
-			norm += this->factorArray[k].val[i];
+			norm += this->factorArray[k].val[i]
+					*this->factorArray[k].val[i];
 	}
 	return norm;
 }
@@ -153,7 +154,7 @@ double ClassMeans::norm()
 	for(int k=0; k<this->numClass; k++)
 	{
 		for(int i=0; i<this->meanVectors[k].size(); i++)
-			norm += this->meanVectors[k][i];
+			norm += this->meanVectors[k][i]*this->meanVectors[k][i];
 	}
 	return norm;
 }
