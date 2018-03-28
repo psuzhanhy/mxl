@@ -140,7 +140,6 @@ void MxlGaussianBlockDiag::simulatedProbability(int sampleID,
 
 		for(int k=0; k<this->numClass; k++)
 			simProb[r*this->numClass+k] = propensityScore[r*this->numClass+k]/sumProb;	
-
 	}
 }
 
@@ -203,20 +202,20 @@ void MxlGaussianBlockDiag::simulatedProbability_inline(int sampleID, std::vector
 double MxlGaussianBlockDiag::negativeLogLik() 
 {
 	double nll = 0;
-	int rvdim = this->numClass * this->R * this->dimension; 
+	int rvdim = this->numClass * this->R * this->dimension;
 	std::vector<double> normalrv(rvdim);
 
 	for(int n=0; n<this->numSamples; n++)
 	{
 		// normal(0,1) draws for sampleID
+		//TODO
 		RngGenerator::var_nor.engine().seed(n);
-		RngGenerator::var_nor.distribution().reset(); 
+		RngGenerator::var_nor.distribution().reset();
 		for(int i=0; i<rvdim; i++)
 			normalrv[i] = RngGenerator::var_nor();	
-
+			
 		std::vector<double> probSim(this->R * this->numClass); 
 		this->simulatedProbability(n,normalrv, probSim);//populate probSim 
-
 		int lbl = this->label[n];
 		double probSAA = 0;
 		for(int r=0; r<this->R; r++)
@@ -232,27 +231,29 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 		ClassMeans &meanGrad, 
 		BlockCholeskey &covGrad)
 {
-	// generate normal(0,1) vector 
+	// generate normal(0,1) vector
+	//TODO seed 
 	RngGenerator::var_nor.engine().seed(sampleID);
 	RngGenerator::var_nor.distribution().reset(); 
+	
 	int rvdim = this->numClass * this->R * this->dimension; 
 	std::vector<double> normalrv(rvdim);
 	// all random draws for sampleID
 	for(int i=0; i<rvdim; i++)
-		normalrv[i] = RngGenerator::var_nor();	
+		normalrv[i] = RngGenerator::var_nor();
 
 	std::vector<double> probSim(this->R * this->numClass); 
 	this->simulatedProbability(sampleID,normalrv, probSim);//populate probSim 
 	// Sample Average Approximated Probability
+	int lbl = this->label[sampleID];
 	double probSAA = 0;
-	for(auto val : probSim)		
-		probSAA += val;
+	for(int r=0; r<this->R; r++)
+		probSAA += probSim[r*this->numClass+lbl];
 	probSAA /= this->R; 
 
 	std::vector<double> summationTerm(this->numClass,0.0);	
 	std::vector<double> summationDraws(this->numClass * this->dimension,0.0);
 	
-	int lbl = this->label[sampleID];
 	for(int k=0; k<this->numClass; k++)
 	{
 		double b;
@@ -269,24 +270,25 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 			   summationDraws[k*this->dimension+i] -= probSim[r*this->numClass+lbl] * b 
 					* normalrv[r*this->numClass*this->dimension+k*this->dimension+i];  
 		}
-
+		
 		for(int i=0; i<this->dimension; i++)
 			summationDraws[k*this->dimension+i] /= (probSAA * this->R);
 
         /* update gradient with respect to constant term */
-        constantGrad[k] += summationTerm[k] / (probSAA * this->R); 
- 
+        constantGrad[k] += summationTerm[k]/(probSAA * this->R);
+		 
         /* update gradient with respect to mean */
-        for(int i= this->xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++)
+        for(int i= this->xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++) 
             meanGrad.meanVectors[k][xfeature.col[i]] += summationTerm[k]/(probSAA * this->R)
  					* xfeature.val[i];
-
+	
         /* update gradient with respect to Covariance Choleskey Factor */
 		int start = k * this->dimension;
 		int end = start + this->dimension - 1;
         this->xfeature.rowOuterProduct2LowerTri(sampleID, 
 				summationDraws, start, end, 
 				covGrad.factorArray[k]);
+
 	}
 
 } // MxlGaussianBlockDiag::gradient
@@ -311,7 +313,7 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 	{
 		for(int n=0; n<this->numSamples; n++)
 			ordering[n] = unid_sampler();
-		
+
 		stepsize *= scalar;
 		for(int n=0; n<this->numSamples; n++)
 		{
@@ -319,7 +321,7 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 			covGrad.setzero();
 			meanGrad.setzero();
 
-			this->gradient(n,constantGrad, meanGrad, covGrad);
+			this->gradient(ordering[n],constantGrad, meanGrad, covGrad);
 			// update mean
 			meanGrad *= stepsize;
 			this->means -= meanGrad;
@@ -328,7 +330,8 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 			this->covCholeskey -= covGrad;
 			// update constants
 			for(int k=0; k<this->numClass; k++)
-				classConstants[k] -= stepsize * constantGrad[k];					
+				classConstants[k] -= stepsize * constantGrad[k];
+		
 		}	
 	}	
 } //MxlGaussianBlockDiag::fit
