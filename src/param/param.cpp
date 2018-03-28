@@ -10,7 +10,7 @@
 
 BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(numclass, dim) 
 {
-	for(int i = 0; i <numClass ; i++)
+	for(int i = 0; i<numClass; i++)
 	{  
 		CSR_matrix factor; 
 		factorArray.push_back(factor);
@@ -55,7 +55,20 @@ void BlockCholeskey::setzero()
 }
 
 
-BlockCholeskey& BlockCholeskey::operator-= (BlockCholeskey const &bcholRHS)
+double BlockCholeskey::norm()
+{
+	double norm = 0.0;
+	for(int k=0; k<this->numClass; k++)
+	{
+		for(int i=0; i<this->factorArray[k].nnz; i++)
+			norm += this->factorArray[k].val[i];
+	}
+	return norm;
+}
+
+
+
+void BlockCholeskey::operator-= (BlockCholeskey const &bcholRHS)
 {
 	try{
 		if (this->numClass != bcholRHS.numClass)
@@ -71,11 +84,11 @@ BlockCholeskey& BlockCholeskey::operator-= (BlockCholeskey const &bcholRHS)
 			this->factorArray[k].val[i] -= bcholRHS.factorArray[k].val[i];
 	}
 	
-	return *this;
+	//return *this;
 }
 
 
-BlockCholeskey& BlockCholeskey::operator*= (double scalar)
+void BlockCholeskey::operator*= (double scalar)
 {
 	for(int k=0; k<this->numClass; k++)
 	{
@@ -83,7 +96,7 @@ BlockCholeskey& BlockCholeskey::operator*= (double scalar)
 			this->factorArray[k].val[i] *= scalar;
 	}
 	
-	return *this;
+	//return *this;
 }
 
 
@@ -134,7 +147,20 @@ void ClassMeans::setzero()
 }
 
 
-ClassMeans& ClassMeans::operator-= (ClassMeans const &clmsRHS)
+double ClassMeans::norm()
+{
+	double norm = 0.0;
+	for(int k=0; k<this->numClass; k++)
+	{
+		for(int i=0; i<this->meanVectors[k].size(); i++)
+			norm += this->meanVectors[k][i];
+	}
+	return norm;
+}
+
+
+
+void ClassMeans::operator-= (ClassMeans const &clmsRHS)
 {
 	try{
 		if (this->numClass != clmsRHS.numClass)
@@ -151,11 +177,11 @@ ClassMeans& ClassMeans::operator-= (ClassMeans const &clmsRHS)
 			this->meanVectors[k][j] -= clmsRHS.meanVectors[k][j];
 	}
 
-	return *this;
+	//return *this;
 }
 
 
-ClassMeans& ClassMeans::operator*= (double scalar)
+void ClassMeans::operator*= (double scalar)
 {
 	for(int k=0; k<this->numClass; k++)
 	{
@@ -163,5 +189,5 @@ ClassMeans& ClassMeans::operator*= (double scalar)
 			this->meanVectors[k][j] *= scalar;
 	}
 
-	return *this;
+	//return *this;
 }

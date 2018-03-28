@@ -18,10 +18,11 @@ struct BlockCholeskey: public MxLParam
 {
 	std::vector<CSR_matrix> factorArray;
 	BlockCholeskey(int numclass, int dim, bool zeroinit); 
-	void setzero();
 	~BlockCholeskey(){}
-	BlockCholeskey& operator-= (BlockCholeskey const& bcholRHS);
-	BlockCholeskey& operator*= (double scalar);
+	void setzero();
+	double norm();
+	void operator-= (BlockCholeskey const& bcholRHS);
+	void operator*= (double scalar);
 	bool operator== (BlockCholeskey const& bcholRHS);
 	
 };
@@ -30,10 +31,11 @@ struct ClassMeans: public MxLParam
 {
 	std::vector<std::vector<double> > meanVectors;
     ClassMeans(int numclass, int dim, bool zeroinit);
+	~ClassMeans() {}
 	void setzero();
-	~ClassMeans() {}	
-	ClassMeans& operator-= (ClassMeans const& clmsRHS);
-	ClassMeans& operator*= (double scalar);
+	double norm();
+	void operator-= (ClassMeans const& clmsRHS);
+	void operator*= (double scalar);
 
 };
 
