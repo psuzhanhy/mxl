@@ -55,7 +55,7 @@ void BlockCholeskey::setzero()
 }
 
 
-BlockCholeskey& BlockCholeskey::operator+= (BlockCholeskey const &bcholRHS)
+BlockCholeskey& BlockCholeskey::operator-= (BlockCholeskey const &bcholRHS)
 {
 	try{
 		if (this->numClass != bcholRHS.numClass)
@@ -68,7 +68,7 @@ BlockCholeskey& BlockCholeskey::operator+= (BlockCholeskey const &bcholRHS)
 	for(int k=0; k<this->numClass; k++)
 	{
 		for(int i=0; i<this->factorArray[k].nnz ; i++)
-			this->factorArray[k].val[i] += bcholRHS.factorArray[k].val[i];
+			this->factorArray[k].val[i] -= bcholRHS.factorArray[k].val[i];
 	}
 	
 	return *this;
@@ -134,7 +134,7 @@ void ClassMeans::setzero()
 }
 
 
-ClassMeans& ClassMeans::operator+= (ClassMeans const &clmsRHS)
+ClassMeans& ClassMeans::operator-= (ClassMeans const &clmsRHS)
 {
 	try{
 		if (this->numClass != clmsRHS.numClass)
@@ -148,7 +148,7 @@ ClassMeans& ClassMeans::operator+= (ClassMeans const &clmsRHS)
 	for(int k=0; k<this->numClass; k++)
 	{
 		for(int j=0; j<this->dimension; j++)
-			this->meanVectors[k][j] += clmsRHS.meanVectors[k][j];
+			this->meanVectors[k][j] -= clmsRHS.meanVectors[k][j];
 	}
 
 	return *this;

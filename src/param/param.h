@@ -20,7 +20,7 @@ struct BlockCholeskey: public MxLParam
 	BlockCholeskey(int numclass, int dim, bool zeroinit); 
 	void setzero();
 	~BlockCholeskey(){}
-	BlockCholeskey& operator+= (BlockCholeskey const& bcholRHS);
+	BlockCholeskey& operator-= (BlockCholeskey const& bcholRHS);
 	BlockCholeskey& operator*= (double scalar);
 	bool operator== (BlockCholeskey const& bcholRHS);
 	
@@ -32,7 +32,7 @@ struct ClassMeans: public MxLParam
     ClassMeans(int numclass, int dim, bool zeroinit);
 	void setzero();
 	~ClassMeans() {}	
-	ClassMeans& operator+= (ClassMeans const& clmsRHS);
+	ClassMeans& operator-= (ClassMeans const& clmsRHS);
 	ClassMeans& operator*= (double scalar);
 
 };
