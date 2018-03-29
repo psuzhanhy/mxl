@@ -6,7 +6,7 @@
 #include <boost/generator_iterator.hpp>
 #include "matvec.h"
 #include "param.h"
-#include "rnggenerator.h"
+#include "common.h"
 
 BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(numclass, dim) 
 {
@@ -26,7 +26,7 @@ BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(n
 		else
 		{
 			for(int j=0 ; j<factorArray[i].nnz ;j++)
-				factorArray[i].val.push_back(RngGenerator::unid_init());
+				factorArray[i].val.push_back(CommonUtility::unid_init());
 		}
 
 		factorArray[i].row_offset.push_back(0);
@@ -134,7 +134,7 @@ ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): MxLParam(numclass,
 		else 
 		{
 			for(int j=0; j<dimension; j++)
-				meanVectors[i].push_back(RngGenerator::unid_init());
+				meanVectors[i].push_back(CommonUtility::unid_init());
 		}
 	} 
 }

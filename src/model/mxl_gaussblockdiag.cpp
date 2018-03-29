@@ -10,7 +10,7 @@
 #include "param.h"
 #include "mxl.h"
 #include "mxl_gaussblockdiag.h"
-#include "rnggenerator.h"
+#include "common.h"
 
 MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 		int numclass, int dim, bool zeroinit, int numdraws): 
@@ -41,7 +41,7 @@ MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 	else
 	{				
 		for(int k=0; k<this->numClass; k++)				
-			this->classConstants[k] = RngGenerator::unid_init();
+			this->classConstants[k] = CommonUtility::unid_init();
 	}
 } 
 
@@ -149,8 +149,8 @@ void MxlGaussianBlockDiag::simulatedProbability_inline(int sampleID, std::vector
 {
 
 	// generate normal(0,1) vector 
-	RngGenerator::var_nor.engine().seed(sampleID);
-	RngGenerator::var_nor.distribution().reset(); 
+	CommonUtility::var_nor.engine().seed(sampleID);
+	CommonUtility::var_nor.distribution().reset(); 
 
 	std::vector<double> meanPropensity(this->numClass); 
 	for(int k=0; k<this->numClass; k++)
@@ -164,7 +164,7 @@ void MxlGaussianBlockDiag::simulatedProbability_inline(int sampleID, std::vector
 	{
 		// random draws
 		for(int i=0; i<rvdim; i++)
-			normalrv[i] = RngGenerator::var_nor();	
+			normalrv[i] = CommonUtility::var_nor();	
 
 		for(int k=0; k<this->numClass; k++)
 		{
@@ -208,10 +208,10 @@ double MxlGaussianBlockDiag::negativeLogLik()
 	for(int n=0; n<this->numSamples; n++)
 	{
 		// normal(0,1) draws for sampleID
-		RngGenerator::var_nor.engine().seed(n+RngGenerator::time_start_int);
-		RngGenerator::var_nor.distribution().reset();
+		CommonUtility::var_nor.engine().seed(n+CommonUtility::time_start_int);
+		CommonUtility::var_nor.distribution().reset();
 		for(int i=0; i<rvdim; i++)
-			normalrv[i] = RngGenerator::var_nor();	
+			normalrv[i] = CommonUtility::var_nor();	
 			
 		std::vector<double> probSim(this->R * this->numClass); 
 		this->simulatedProbability(n,normalrv, probSim);//populate probSim 
@@ -231,14 +231,14 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 		BlockCholeskey &covGrad)
 {
 	// generate normal(0,1) vector
-	RngGenerator::var_nor.engine().seed(sampleID+RngGenerator::time_start_int);
-	RngGenerator::var_nor.distribution().reset(); 
+	CommonUtility::var_nor.engine().seed(sampleID+CommonUtility::time_start_int);
+	CommonUtility::var_nor.distribution().reset(); 
 	
 	int rvdim = this->numClass * this->R * this->dimension; 
 	std::vector<double> normalrv(rvdim);
 	// all random draws for sampleID
 	for(int i=0; i<rvdim; i++)
-		normalrv[i] = RngGenerator::var_nor();
+		normalrv[i] = CommonUtility::var_nor();
 
 	std::vector<double> probSim(this->R * this->numClass); 
 	this->simulatedProbability(sampleID,normalrv, probSim);//populate probSim 
@@ -300,7 +300,7 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 
 	boost::uniform_int<> unid_discrete(0, this->numSamples-1);
     boost::variate_generator<boost::mt19937&,boost::uniform_int<> > 
-			unid_sampler(RngGenerator::rng, unid_discrete);
+			unid_sampler(CommonUtility::rng, unid_discrete);
 
 	ClassMeans meanGrad(this->numClass, this->dimension, true);
 	BlockCholeskey covGrad(this->numClass, this->dimension, true);
