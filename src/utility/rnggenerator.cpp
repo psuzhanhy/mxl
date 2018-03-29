@@ -8,7 +8,9 @@
 #include <boost/generator_iterator.hpp>
 #include "rnggenerator.h"
 
-boost::mt19937 RngGenerator::rng(time(NULL));
+time_t RngGenerator::time_start = time(nullptr);
+int RngGenerator::time_start_int = static_cast<int> (RngGenerator::time_start);
+boost::mt19937 RngGenerator::rng(RngGenerator::time_start);
 boost::random::uniform_real_distribution<> RngGenerator::unid(0, 1);
 boost::variate_generator<boost::mt19937&,boost::random::uniform_real_distribution<> > RngGenerator::unid_init(rng, unid);
 

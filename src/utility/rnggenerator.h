@@ -12,6 +12,8 @@
 class RngGenerator
 {
 	public:
+		static time_t time_start;
+		static int time_start_int;
 		static boost::mt19937 rng;
 		static boost::random::uniform_real_distribution<> unid;
 		static boost::variate_generator<boost::mt19937&,boost::random::uniform_real_distribution<>> unid_init;

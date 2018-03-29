@@ -208,8 +208,7 @@ double MxlGaussianBlockDiag::negativeLogLik()
 	for(int n=0; n<this->numSamples; n++)
 	{
 		// normal(0,1) draws for sampleID
-		//TODO
-		RngGenerator::var_nor.engine().seed(n);
+		RngGenerator::var_nor.engine().seed(n+RngGenerator::time_start_int);
 		RngGenerator::var_nor.distribution().reset();
 		for(int i=0; i<rvdim; i++)
 			normalrv[i] = RngGenerator::var_nor();	
@@ -232,8 +231,7 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 		BlockCholeskey &covGrad)
 {
 	// generate normal(0,1) vector
-	//TODO seed 
-	RngGenerator::var_nor.engine().seed(sampleID);
+	RngGenerator::var_nor.engine().seed(sampleID+RngGenerator::time_start_int);
 	RngGenerator::var_nor.distribution().reset(); 
 	
 	int rvdim = this->numClass * this->R * this->dimension; 
