@@ -3,9 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include <boost/random.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <boost/generator_iterator.hpp>
 
 struct CSR_matrix  
 {
