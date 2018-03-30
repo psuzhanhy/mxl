@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <sys/time.h>
+#include <iostream>
 #include "matvec.h"
 #include "readinput.h"
 
