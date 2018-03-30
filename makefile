@@ -1,8 +1,8 @@
 CXX = g++
-CXXFLAGS = -std=c++11 -O3 -flto -I src/utility/ -I src/model/ -I src/param/ -I ../../../work/boost_1_63_0/
+CXXFLAGS = -std=c++11 -fopenmp -O3 -flto -I src/utility/ -I src/model/ -I src/param/ -I Random123/include/ -I Random123/examples/
 
-main: testing/testgmxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/rnggenerator.o
-	$(CXX) $(CXXFLAGS) -o main testing/testgmxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/rnggenerator.o
+main: testing/testgmxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o
+	$(CXX) $(CXXFLAGS) -o main testing/testgmxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o
 
 testgmxl.o: testing/testgmxl.cpp 
 	$(CXX) $(CXXFLAGS) -c testing/testgmxl.cpp
@@ -19,8 +19,8 @@ mxl_gaussblockdiag.o: src/model/mxl_gaussblockdiag.cpp
 readinput.o: src/utility/readinput.cpp 
 	$(CXX) $(CXXFLAGS) -c src/utility/readinput.cpp 
 
-rnggenerator.o: src/utility/rnggenerator.cpp
-	$(CXX) $(CXXFLAGS) -c src/utility/rnggenerator.cpp
+common.o: src/utility/common.cpp
+	$(CXX) $(CXXFLAGS) -c src/utility/common.cpp
 
 
 
