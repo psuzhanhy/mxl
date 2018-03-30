@@ -53,7 +53,7 @@ MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
         	ctr[0] = k;	
         	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
 			double x = r123::uneg11<double>(unidrand[0]);	
-			this->classConstants[k] = x;
+			this->classConstants[k] = 0.5*(x+1.0);
 		}
 	}
 } 
@@ -176,19 +176,18 @@ void MxlGaussianBlockDiag::simulatedProbability_inline(int sampleID, std::vector
 	std::vector<double> propensityScore(this->numClass);
 	int rvdim = this->numClass * this->dimension; 
 	std::vector<double> normalrv(rvdim);
+	ctr[0] = sampleID;
 	for(int r=0; r<this->R; r++)
 	{
 		// random draws
 		for(int i=0; i<rvdim/2; i++)
 		{
-			ctr[0] = sampleID;
 			ctr[1] = i;
         	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
 			auto nr = r123::boxmuller(unidrand[0], unidrand[1]);	
 			normalrv[2*i] = nr.x;
 			normalrv[2*i+1] = nr.y;	
 		}
-		ctr[0] = sampleID;
 		ctr[1] = rvdim/2;
         CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
 		auto nr = r123::boxmuller(unidrand[0], unidrand[1]);
@@ -231,8 +230,8 @@ double MxlGaussianBlockDiag::negativeLogLik()
 {
 	double nll = 0;
 	int rvdim = this->numClass * this->R * this->dimension;
-	//std::vector<double> normalrv(rvdim);
 	//normal(0,1) draws for sampleID
+	std::vector<double> normalrv(rvdim);
 
 	CommonUtility::CBRNG g;
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
@@ -241,18 +240,15 @@ double MxlGaussianBlockDiag::negativeLogLik()
 	//#pragma omp parallel for firstprivate(rng,nd,var_nor) reduction(+:nll) num_threads(2) 
 	for(int n=0; n<this->numSamples; n++)
 	{
-		// normal(0,1) draws for sampleID
-		std::vector<double> normalrv(rvdim);
+		ctr[0] = n;		
 		for(int i=0; i<rvdim/2; i++)
 		{
-			ctr[0] = n;
 			ctr[1] = i;
         	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
 			auto nr = r123::boxmuller(unidrand[0], unidrand[1]);	
 			normalrv[2*i] = nr.x;
 			normalrv[2*i+1] = nr.y;			
 		}
-		ctr[0] = n;
 		ctr[1] = rvdim/2;
         CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
 		auto nr = r123::boxmuller(unidrand[0], unidrand[1]);
@@ -280,20 +276,18 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
     CommonUtility::CBRNG::key_type key = {{}};	
 	key[0] = CommonUtility::time_start_int;//seed	
-
+	ctr[0] = sampleID;
 	int rvdim = this->numClass * this->R * this->dimension; 
 	std::vector<double> normalrv(rvdim);
 	// all random draws for sampleID
 	for(int i=0; i<rvdim/2; i++)
 	{
-		ctr[0] = sampleID;
 		ctr[1] = i;
 		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
 		auto nr = r123::boxmuller(unidrand[0], unidrand[1]);	
 		normalrv[2*i] = nr.x;
 		normalrv[2*i+1] = nr.y;			
 	}
-	ctr[0] = sampleID;
 	ctr[1] = rvdim/2;
 	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
 	auto nr = r123::boxmuller(unidrand[0], unidrand[1]);
@@ -379,7 +373,6 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
         	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
 			double x = r123::uneg11<double>(unidrand[0]);
 			int r = 0.5 * (x + 1.0) * (this->numSamples-1);//discretize
-			std::cout << r << std::endl;
 			ordering[n] = r;
 		}
 		stepsize *= scalar;

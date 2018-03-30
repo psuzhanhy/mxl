@@ -35,9 +35,8 @@ BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(n
 				ctr[1] = j;	
         		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
 				double x = r123::uneg11<double>(unidrand[0]);
-				//TODO
-				std::cout << x << std::endl;
-				factorArray[i].val.push_back(x);
+				factorArray[i].val.push_back(0.5*(x+1.0));
+				std::cout << factorArray[i].val[j] << std::endl; //TODO
 			}
 		}
 
@@ -155,7 +154,8 @@ ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): MxLParam(numclass,
 				ctr[1] = j;	
         		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
 				double x = r123::uneg11<double>(unidrand[0]);	
-				meanVectors[i].push_back(x);
+				meanVectors[i].push_back(0.5*(x+1.0));
+				std::cout << meanVectors[i][j] << std::endl; //TODO
 			}
 		}
 	} 
