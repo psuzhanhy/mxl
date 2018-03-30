@@ -3,8 +3,10 @@
 #include <vector>
 #include <sys/time.h>
 #include <iostream>
+#include <string.h>
 #include "matvec.h"
 #include "readinput.h"
+#include "common.h"
 
 CSR_matrix Dense2CSR (DenseData denseInput) 
 { 
