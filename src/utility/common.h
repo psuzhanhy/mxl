@@ -5,22 +5,16 @@
 #include <vector>
 #include <unistd.h>
 #include <sys/time.h>
-#include <boost/random.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <boost/generator_iterator.hpp>
+#include <Random123/threefry.h>
+
 
 class CommonUtility
 {
 	public:
+    	typedef r123::Threefry2x64 CBRNG;
 		static time_t time_start;
 		static int time_start_int;
-		static boost::mt19937 rng;
-		static boost::random::uniform_real_distribution<> unid;
-		static boost::variate_generator<boost::mt19937&,boost::random::uniform_real_distribution<>> unid_init;
-
-	    static boost::normal_distribution<> nd;
-	    static boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > var_nor;
-		
+		static int numThreads;
 };
 
 #endif

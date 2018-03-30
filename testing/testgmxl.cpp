@@ -3,9 +3,7 @@
 #include <vector>
 #include <unistd.h>
 #include <sys/time.h>
-#include <boost/random.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <boost/generator_iterator.hpp>
+#include <iostream>
 #include "matvec.h"
 #include "mxl_gaussblockdiag.h"
 #include "readinput.h"
@@ -21,7 +19,7 @@ int main(int argc, char **argv)
     ReadDenseInput(input_filename, &data);   
 	CSR_matrix xf = Dense2CSR(data);
 	MxlGaussianBlockDiag gmxl1 = MxlGaussianBlockDiag(xf, data.label,
-						 numclass, xf.number_cols, true, 1000);
+						 numclass, xf.number_cols, false, 1000);
 
 	/*
 	MxlGaussianBlockDiag gmxl2 = MxlGaussianBlockDiag(xf, data.label,

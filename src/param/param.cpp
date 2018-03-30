@@ -1,15 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include <boost/random.hpp>
-#include <boost/random/normal_distribution.hpp>
-#include <boost/generator_iterator.hpp>
+#include <iostream>
+#include <Random123/threefry.h>
+#include "uniform.hpp"
 #include "matvec.h"
 #include "param.h"
 #include "common.h"
 
 BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(numclass, dim) 
 {
+	CommonUtility::CBRNG g;
+	CommonUtility::CBRNG::ctr_type ctr = {{}};
+    CommonUtility::CBRNG::key_type key = {{}};	
+	key[0] = static_cast<int> (time(nullptr));//seed
 	for(int i = 0; i<numClass; i++)
 	{  
 		CSR_matrix factor; 
@@ -26,7 +30,15 @@ BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(n
 		else
 		{
 			for(int j=0 ; j<factorArray[i].nnz ;j++)
-				factorArray[i].val.push_back(CommonUtility::unid_init());
+			{
+				ctr[0] = i;
+				ctr[1] = j;	
+        		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
+				double x = r123::uneg11<double>(unidrand[0]);
+				//TODO
+				std::cout << x << std::endl;
+				factorArray[i].val.push_back(x);
+			}
 		}
 
 		factorArray[i].row_offset.push_back(0);
@@ -122,6 +134,10 @@ bool BlockCholeskey::operator== (BlockCholeskey const &bcholRHS)
 
 ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): MxLParam(numclass, dim)  
 {
+	CommonUtility::CBRNG g;
+	CommonUtility::CBRNG::ctr_type ctr = {{}};
+    CommonUtility::CBRNG::key_type key = {{}};	
+	key[0] = static_cast<int> (time(nullptr));//seed
 	std::vector<double> row;
 	for (int i=0; i<numClass; i++)
 	{
@@ -134,7 +150,13 @@ ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): MxLParam(numclass,
 		else 
 		{
 			for(int j=0; j<dimension; j++)
-				meanVectors[i].push_back(CommonUtility::unid_init());
+			{
+				ctr[0] = i;
+				ctr[1] = j;	
+        		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
+				double x = r123::uneg11<double>(unidrand[0]);	
+				meanVectors[i].push_back(x);
+			}
 		}
 	} 
 }
