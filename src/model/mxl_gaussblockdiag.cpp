@@ -6,6 +6,7 @@
 #include <omp.h>
 #include <iostream>
 #include <Random123/threefry.h>
+#include <Random123/philox.h>
 #include "uniform.hpp"
 #include "boxmuller.hpp"
 #include "matvec.h"
@@ -229,6 +230,8 @@ void MxlGaussianBlockDiag::simulatedProbability_inline(int sampleID, std::vector
 double MxlGaussianBlockDiag::negativeLogLik() 
 {
 	double nll = 0;
+	#pragma omp parallel num_threads(CommonUtility::numThreads)
+	{
 	int rvdim = this->numClass * this->R * this->dimension;
 	//normal(0,1) draws for sampleID
 	std::vector<double> normalrv(rvdim);
@@ -237,7 +240,7 @@ double MxlGaussianBlockDiag::negativeLogLik()
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
     CommonUtility::CBRNG::key_type key = {{}};	
 	key[0] = CommonUtility::time_start_int;//seed	
-	//#pragma omp parallel for firstprivate(rng,nd,var_nor) reduction(+:nll) num_threads(2) 
+	#pragma omp for reduction(+:nll) 
 	for(int n=0; n<this->numSamples; n++)
 	{
 		ctr[0] = n;		
@@ -261,7 +264,9 @@ double MxlGaussianBlockDiag::negativeLogLik()
 		for(int r=0; r<this->R; r++)
 			probSAA += probSim[r*this->numClass+lbl];
 		nll += log(probSAA/this->R); 
-	}
+	} // pragma omp for reduction(+:nll)
+	} //pragma omp parallel num_threads(2)
+
 	return -nll;
 }
 
@@ -351,32 +356,33 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 	*	fit Sample Average Approximated marginal log-likelihood with SGD 
 	*/
 
-
-
 	ClassMeans meanGrad(this->numClass, this->dimension, true);
 	BlockCholeskey covGrad(this->numClass, this->dimension, true);
 	std::vector<double> constantGrad(this->numClass);
-	std::vector<double> ordering(this->numSamples);
 
 	CommonUtility::CBRNG g;
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
     CommonUtility::CBRNG::key_type key = {{}};	
 	key[0] = CommonUtility::time_start_int;//seed	
 
-    //#pragma omp parallel num_threads(CommonUtility::numThreads) 	
 	for(int t=0; t<maxEpochs; t++)
 	{
-		for(int n=0; n<this->numSamples; n++)
+		#pragma omp parallel num_threads(CommonUtility::numThreads) firstprivate(meanGrad,covGrad,constantGrad) 
+		{
+        int nThreads = omp_get_num_threads();	
+		int tid = omp_get_thread_num();	
+		std::vector<double> ordering(this->numSamples/nThreads);	
+		for(int n=0; n<this->numSamples/nThreads; n++)
 		{
 			ctr[0] = t;
-			ctr[1] = n;
+			ctr[1] = numSamples/nThreads * tid + n;
         	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
 			double x = r123::uneg11<double>(unidrand[0]);
-			int r = 0.5 * (x + 1.0) * (this->numSamples-1);//discretize
+			int r = 0.5 * (x + 1.0) * (this->numSamples-1);//discretized range
 			ordering[n] = r;
 		}
 		stepsize *= scalar;
-		for(int n=0; n<this->numSamples; n++)
+		for(int n=0; n<this->numSamples/nThreads; n++)
 		{
 			std::fill(constantGrad.begin(), constantGrad.end(), 0.0);
 			covGrad.setzero();
@@ -394,6 +400,7 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 				classConstants[k] -= stepsize * constantGrad[k];
 		
 		}	
+		} //pragma omp parallel
 	}	
 } //MxlGaussianBlockDiag::fit
 
