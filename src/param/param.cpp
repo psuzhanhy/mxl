@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <Random123/threefry.h>
+#include <Random123/philox.h>
 #include "uniform.hpp"
 #include "matvec.h"
 #include "param.h"
@@ -36,7 +37,6 @@ BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(n
         		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
 				double x = r123::uneg11<double>(unidrand[0]);
 				factorArray[i].val.push_back(0.5*(x+1.0));
-				std::cout << factorArray[i].val[j] << std::endl; //TODO
 			}
 		}
 
@@ -155,7 +155,6 @@ ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): MxLParam(numclass,
         		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
 				double x = r123::uneg11<double>(unidrand[0]);	
 				meanVectors[i].push_back(0.5*(x+1.0));
-				std::cout << meanVectors[i][j] << std::endl; //TODO
 			}
 		}
 	} 

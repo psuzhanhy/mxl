@@ -40,14 +40,16 @@ int main(int argc, char **argv)
 	
 	//for(auto val : prob)
 	//	std::cout << val << std::endl;
-	
+		
 	struct timeval start, finish;
-    gettimeofday(&start,nullptr) ; // set timer start      
-	std::cout << "Initial NLL: " << gmxl1.negativeLogLik() << std::endl;
-    gettimeofday(&finish,nullptr) ; // set timer finish      
-	double elapsedTime = finish.tv_sec - start.tv_sec;      // sec 
-    elapsedTime += (finish.tv_usec - start.tv_usec)/(1000.0 * 1000.0);   // us to sec
-	std::cout << "time for computing NLL: " << elapsedTime << std::endl;
+    
+	//gettimeofday(&start,nullptr) ; // set timer start      
+	//std::cout << "Initial NLL: " << gmxl1.negativeLogLik() << std::endl;
+   // gettimeofday(&finish,nullptr) ; // set timer finish      
+	double elapsedTime; 
+	//elapsedTime = finish.tv_sec - start.tv_sec;      // sec 
+    //elapsedTime += (finish.tv_usec - start.tv_usec)/(1000.0 * 1000.0);   // us to sec
+	//std::cout << "time for computing NLL: " << elapsedTime << std::endl;
 		
 	double stepsize = 1.0;
 	double scalar = 1.0;

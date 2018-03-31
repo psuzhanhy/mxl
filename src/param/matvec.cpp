@@ -32,7 +32,6 @@ void CSR_matrix::rowOuterProduct2LowerTri(int rowID,
 		int start, int end, CSR_matrix &lowerTriCSR) 
 {
 	/*
-	TODO: improve generality
 	compute the outer product between a row in a CSR matrix and a dense vector
 	row (outer) rightvec, only increment results correspond to nonzero entries 
 	 in lowerMat (lower triangluer CSR)
