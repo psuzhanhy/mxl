@@ -43,6 +43,17 @@ class MxlGaussianBlockDiag : public MixedLogit
 				ClassMeans &meanGrad, BlockCholeskey &covGrad);
 
 		void fit(double stepsize, double scalar, int maxEpochs);
+
+		double l2normsq(const ClassMeans &mean1,
+				const BlockCholeskey &cov1,
+				const std::vector<double> &constants1, 
+				const ClassMeans &mean2,
+				const BlockCholeskey &cov2,
+				const std::vector<double> &constants2) const;
+
+		double l2normsq(const ClassMeans &mean1,
+				const BlockCholeskey &cov1,
+				const std::vector<double> &constants1) const;
 				
 		BlockCholeskey getCovCholeskey() {return this->covCholeskey;}
 

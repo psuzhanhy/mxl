@@ -65,7 +65,7 @@ void BlockCholeskey::setzero()
 }
 
 
-double BlockCholeskey::norm()
+double BlockCholeskey::l2normsq() const
 {
 	double norm = 0.0;
 	for(int k=0; k<this->numClass; k++)
@@ -98,6 +98,27 @@ BlockCholeskey& BlockCholeskey::operator-= (BlockCholeskey const &bcholRHS)
 	return *this;
 }
 
+
+BlockCholeskey BlockCholeskey::operator- (BlockCholeskey const &bcholRHS) const
+{
+	try{
+		if (this->numClass != bcholRHS.numClass)
+			throw "numClass in LHS and RHS does not match\n";
+		if (this->dimension != bcholRHS.dimension)
+			throw "dimension in LHS and RHS does not match\n";
+	} catch (const char* msg) {
+		std::cout << msg << std::endl;
+	}
+
+	BlockCholeskey res(*this);
+	for(int k=0; k<res.numClass; k++)
+	{
+		for(int i=0; i<res.factorArray[k].nnz ; i++)
+			res.factorArray[k].val[i] -= bcholRHS.factorArray[k].val[i];
+	}
+	
+	return res;
+}
 
 BlockCholeskey& BlockCholeskey::operator*= (double scalar)
 {
@@ -168,7 +189,7 @@ void ClassMeans::setzero()
 }
 
 
-double ClassMeans::norm()
+double ClassMeans::l2normsq() const
 {
 	double norm = 0.0;
 	for(int k=0; k<this->numClass; k++)
@@ -199,6 +220,29 @@ ClassMeans& ClassMeans::operator-= (ClassMeans const &clmsRHS)
 	}
 
 	return *this;
+}
+
+
+
+ClassMeans ClassMeans::operator- (ClassMeans const &clmsRHS) const
+{
+	try{
+		if (this->numClass != clmsRHS.numClass)
+			throw "numClass in LHS and RHS does not match\n";
+		if (this->dimension != clmsRHS.dimension)
+			throw "dimension in LHS and RHS does not match\n";
+	} catch (const char* msg) {
+		std::cout << msg << std::endl;
+	}
+
+	ClassMeans res(*this);
+	for(int k=0; k<res.numClass; k++)
+	{
+		for(int j=0; j<res.dimension; j++)
+			res.meanVectors[k][j] -= clmsRHS.meanVectors[k][j];
+	}
+
+	return res;
 }
 
 

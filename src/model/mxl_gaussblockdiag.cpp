@@ -405,3 +405,37 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 } //MxlGaussianBlockDiag::fit
 
 
+double MxlGaussianBlockDiag::l2normsq(const ClassMeans &mean1,
+									const BlockCholeskey &cov1,
+									const std::vector<double> &constants1, 
+									const ClassMeans &mean2,
+									const BlockCholeskey &cov2,
+									const std::vector<double> &constants2) const
+{
+	
+	double norm = 0.0;
+	for(int k=0; k<this->numClass; k++)	
+		norm += (constants1[k] - constants2[k]) * (constants1[k] - constants2[k]);
+
+	BlockCholeskey covDiff = cov1 - cov2;
+	ClassMeans meanDiff = mean1 - mean2;
+
+	norm += covDiff.l2normsq();
+	norm += meanDiff.l2normsq();
+
+	return norm;
+}
+
+double MxlGaussianBlockDiag::l2normsq(const ClassMeans &mean1,
+									const BlockCholeskey &cov1,
+									const std::vector<double> &constants1) const
+{	
+	double norm = 0.0;
+	for(int k=0; k<this->numClass; k++)	
+		norm += constants1[k] * constants1[k];
+
+	norm += cov1.l2normsq();
+	norm += mean1.l2normsq();
+
+	return norm;
+}
