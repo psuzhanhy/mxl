@@ -17,6 +17,7 @@ class CommonUtility
 		static time_t time_start;
 		static int time_start_int;
 		static int numThreads;
+		static int numSecondaryThreads;
 };
 
 #endif
