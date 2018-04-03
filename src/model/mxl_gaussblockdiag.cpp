@@ -14,7 +14,7 @@
 #include "mxl.h"
 #include "mxl_gaussblockdiag.h"
 #include "common.h"
-
+#include "opthistory.h"
 
 
 MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
@@ -61,7 +61,10 @@ MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 
 
 
-void MxlGaussianBlockDiag::propensityFunction(int sampleID, 
+void MxlGaussianBlockDiag::propensityFunction(const std::vector<double> &classConstants,
+	    const ClassMeans &means,
+		const BlockCholeskey &covCholeskey,
+		int sampleID, 
 		const std::vector<double> &normalDraws,
 		std::vector<double> &classPropensity) 
 {
@@ -75,8 +78,8 @@ void MxlGaussianBlockDiag::propensityFunction(int sampleID,
 	*/
 	std::vector<double> meanPropensity(this->numClass); 
 	for(int k=0; k<this->numClass; k++)
-		meanPropensity[k] = this->xfeature.rowInnerProduct(this->means.meanVectors[k],
-					this->means.dimension, sampleID);
+		meanPropensity[k] = this->xfeature.rowInnerProduct(means.meanVectors[k],
+					means.dimension, sampleID);
 
 	for(int r=0; r<this->R; r++)
 	{
@@ -85,7 +88,7 @@ void MxlGaussianBlockDiag::propensityFunction(int sampleID,
 			int start = r * this->numClass * this->dimension + k * this->dimension;
 			int end = start + this->dimension - 1;
 
-			double randomPropensity = this->covCholeskey.factorArray[k].quadraticForm(this->xfeature, 
+			double randomPropensity = covCholeskey.factorArray[k].quadraticForm(this->xfeature, 
 					sampleID, normalDraws,start,end);
 
 			classPropensity[r*this->numClass+k] = meanPropensity[k]+randomPropensity+classConstants[k];
@@ -120,7 +123,11 @@ void MxlGaussianBlockDiag::multinomialProb(
 
 
 
-void MxlGaussianBlockDiag::simulatedProbability(int sampleID, 
+void MxlGaussianBlockDiag::simulatedProbability(
+		const std::vector<double> &classConstants,
+	    const ClassMeans &means,
+		const BlockCholeskey &covCholeskey,
+		int sampleID, 
 		const std::vector<double> &normalrv, 
 		std::vector<double> &simProb)
 {
@@ -134,7 +141,9 @@ void MxlGaussianBlockDiag::simulatedProbability(int sampleID,
 
 	// length R * numClass
 	std::vector<double> propensityScore(this->numClass * this->R);
-	this->propensityFunction(sampleID, normalrv, propensityScore); 	
+	this->propensityFunction(classConstants, means, covCholeskey,
+			sampleID, normalrv, propensityScore); 	
+
  	for(int r=0; r<this->R; r++)
 	{
 		double maxscore = propensityScore[r*this->numClass];
@@ -227,10 +236,13 @@ void MxlGaussianBlockDiag::simulatedProbability_inline(int sampleID, std::vector
 
 
 
-double MxlGaussianBlockDiag::negativeLogLik() 
+double MxlGaussianBlockDiag::negativeLogLik(
+		const std::vector<double> &classConstants,
+	    const ClassMeans &means,
+		const BlockCholeskey &covCholeskey, int numThreads) 
 {
 	double nll = 0;
-	#pragma omp parallel num_threads(CommonUtility::numThreads)
+	#pragma omp parallel num_threads(numThreads)
 	{
 	int rvdim = this->numClass * this->R * this->dimension;
 	//normal(0,1) draws for sampleID
@@ -257,15 +269,18 @@ double MxlGaussianBlockDiag::negativeLogLik()
 		auto nr = r123::boxmuller(unidrand[0], unidrand[1]);
 		normalrv[rvdim-1] = nr.x;
 	
-		std::vector<double> probSim(this->R * this->numClass); 
-		this->simulatedProbability(n,normalrv, probSim);//populate probSim 
+		std::vector<double> probSim(this->R * this->numClass);
+		//populate probSim 
+		this->simulatedProbability(classConstants, means, 
+				covCholeskey, n,normalrv, probSim);
+ 
 		int lbl = this->label[n];
 		double probSAA = 0;
 		for(int r=0; r<this->R; r++)
 			probSAA += probSim[r*this->numClass+lbl];
 		nll += log(probSAA/this->R); 
 	} // pragma omp for reduction(+:nll)
-	} //pragma omp parallel num_threads(2)
+	} //pragma omp parallel num_threads
 
 	return -nll;
 }
@@ -298,8 +313,10 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 	auto nr = r123::boxmuller(unidrand[0], unidrand[1]);
 	normalrv[rvdim-1] = nr.x;
 
-	std::vector<double> probSim(this->R * this->numClass); 
-	this->simulatedProbability(sampleID,normalrv, probSim);//populate probSim 
+	std::vector<double> probSim(this->R * this->numClass);
+	//populate probSim 
+	this->simulatedProbability(this->classConstants, this->means, 
+			this->covCholeskey, sampleID,normalrv, probSim);
 	// Sample Average Approximated Probability
 	int lbl = this->label[sampleID];
 	double probSAA = 0;
@@ -321,23 +338,26 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 			} else {
 				b = (1-probSim[r*this->numClass+k]);
 			}	
-			summationTerm[k] -= probSim[r*this->numClass+lbl] * b; 
+			summationTerm[k] -= probSim[r*this->numClass+lbl] * b;
 			for(int i=0 ; i<this->dimension ; i++)
 			   summationDraws[k*this->dimension+i] -= probSim[r*this->numClass+lbl] * b 
-					* normalrv[r*this->numClass*this->dimension+k*this->dimension+i];  
+					* normalrv[r*this->numClass*this->dimension+k*this->dimension+i];
 		}
 		
 		for(int i=0; i<this->dimension; i++)
-			summationDraws[k*this->dimension+i] /= (probSAA * this->R);
+			summationDraws[k*this->dimension+i] /= (probSAA * this->R * this->numSamples);
 
-        /* update gradient with respect to constant term */
-        constantGrad[k] += summationTerm[k]/(probSAA * this->R);
-		 
+        /* update gradient with respect to constant term */  
+		double increment =  summationTerm[k]/(probSAA * this->R * this->numSamples);
+		#pragma omp atomic
+        constantGrad[k] += increment;		 
         /* update gradient with respect to mean */
         for(int i= this->xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++) 
-            meanGrad.meanVectors[k][xfeature.col[i]] += summationTerm[k]/(probSAA * this->R)
- 					* xfeature.val[i];
-	
+		{
+        	increment =  summationTerm[k]/(probSAA * this->R * this->numSamples) * xfeature.val[i];
+			#pragma omp atomic
+			meanGrad.meanVectors[k][xfeature.col[i]] += increment;
+		}
         /* update gradient with respect to Covariance Choleskey Factor */
 		int start = k * this->dimension;
 		int end = start + this->dimension - 1;
@@ -346,11 +366,12 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 				covGrad.factorArray[k]);
 
 	}
+	
+} //MxlGaussianBlockDiag::gradient
 
-} // MxlGaussianBlockDiag::gradient
 
-
-void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
+void MxlGaussianBlockDiag::fit_by_SGD(double stepsize, double scalar, 
+		int maxEpochs, OptHistory &history)
 {
 	/*
 	*	fit Sample Average Approximated marginal log-likelihood with SGD 
@@ -365,9 +386,23 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
     CommonUtility::CBRNG::key_type key = {{}};	
 	key[0] = CommonUtility::time_start_int;//seed	
 
+	history.nll[0] = this->negativeLogLik(); 
+	std::cout << "intial NLL " << history.nll[0] << std::endl;	
+	history.gradNormSq[0] = this->gradNormSq(meanGrad, covGrad,
+			constantGrad, CommonUtility::numSecondaryThreads);
+	std::cout << "Initial squared l2-norm of gradient: " 
+			<< history.gradNormSq[0] << std::endl;	
+	struct timeval start, finish;
+	/***************************************************************************/
+	/********************* start SGD *******************************************/	
 	for(int t=0; t<maxEpochs; t++)
 	{
-		#pragma omp parallel num_threads(CommonUtility::numThreads) firstprivate(meanGrad,covGrad,constantGrad) 
+		gettimeofday(&start,nullptr) ; // set timer start 
+		ClassMeans meanOld(this->means);
+		BlockCholeskey covOld(this->covCholeskey);
+		std::vector<double> constantsOld(this->classConstants);
+		#pragma omp parallel num_threads(CommonUtility::numThreads)\
+		firstprivate(meanGrad,covGrad,constantGrad) 
 		{
         int nThreads = omp_get_num_threads();	
 		int tid = omp_get_thread_num();	
@@ -376,9 +411,11 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 		{
 			ctr[0] = t;
 			ctr[1] = numSamples/nThreads * tid + n;
-        	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
+			//unif(-1,1)
+        	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); 
 			double x = r123::uneg11<double>(unidrand[0]);
-			int r = 0.5 * (x + 1.0) * (this->numSamples-1);//discretized range
+			//discretized range
+			int r = 0.5 * (x + 1.0) * (this->numSamples-1);
 			ordering[n] = r;
 		}
 		stepsize *= scalar;
@@ -397,20 +434,161 @@ void MxlGaussianBlockDiag::fit(double stepsize, double scalar, int maxEpochs)
 			this->covCholeskey -= covGrad;
 			// update constants
 			for(int k=0; k<this->numClass; k++)
-				classConstants[k] -= stepsize * constantGrad[k];
-		
+				classConstants[k] -= stepsize * constantGrad[k];		
 		}	
 		} //pragma omp parallel
+		
+		/***********************************************************************/	
+		/***************** accounting for optimization *************************/
+    	gettimeofday(&finish,nullptr) ; // set timer finish      
+		history.iterTime[t+1] = finish.tv_sec - start.tv_sec;     
+    	history.iterTime[t+1] += (finish.tv_usec-start.tv_usec)/(1000.0 * 1000.0);   
+		history.iterTime[t+1] += history.iterTime[t];
+
+		history.gradNormSq[t+1] = this->gradNormSq(meanGrad, covGrad,
+				constantGrad, CommonUtility::numSecondaryThreads);
+		std::cout << "squared l2-norm of gradient after " << t+1 
+				<<" iterations of SGD: " << history.gradNormSq[t+1] << std::endl;
+	
+		double change = this->l2normsq(this->means, this->covCholeskey, 
+				this->classConstants, meanOld, covOld, constantsOld);
+		history.paramChange[t+1] = sqrt(change);
+		std::cout << "change of parameters in l2-norm in " << t+1 << " iteration: "
+				<< history.paramChange[t+1] << std::endl;		
+	
+		history.nll[t+1] = this->negativeLogLik();
+		std::cout << "NLL after " << t+1 << " iterations of SGD: " 
+				<< history.nll[t+1] << std::endl;	
+		/***********************************************************************/	
 	}	
-} //MxlGaussianBlockDiag::fit
+} //MxlGaussianBlockDiag::fit_by_SGD
+
+
+void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum, 
+		double momentumShrinkage, int maxIter, OptHistory &history)
+{
+
+	ClassMeans meanGrad(this->numClass, this->dimension, true);
+	BlockCholeskey covGrad(this->numClass, this->dimension, true);
+	std::vector<double> constantGrad(this->numClass);
+	// x iterates
+	ClassMeans mean_x(this->means);
+	BlockCholeskey cov_x(this->covCholeskey);
+	std::vector<double> classConstants_x(this->classConstants);
+	// x iterates new
+	ClassMeans mean_x_new(this->means);
+	BlockCholeskey cov_x_new(this->covCholeskey);
+	std::vector<double> classConstants_x_new(this->classConstants);
+	// v iterates
+	ClassMeans mean_v(this->means);
+	BlockCholeskey cov_v(this->covCholeskey);
+	std::vector<double> classConstants_v(this->classConstants);
+
+	CommonUtility::CBRNG g;
+	CommonUtility::CBRNG::ctr_type ctr = {{}};
+    CommonUtility::CBRNG::key_type key = {{}};	
+	key[0] = CommonUtility::time_start_int;//seed	
+
+	history.nll[0] = this->negativeLogLik(); 
+	std::cout << "intial NLL " << history.nll[0] << std::endl;	
+	struct timeval start, finish;
+	/***************************************************************************/
+	/********************* start APG *******************************************/	
+	for(int t=0; t<maxIter; t++)
+	{
+		gettimeofday(&start,nullptr) ; // set timer start 
+		std::fill(constantGrad.begin(), constantGrad.end(), 0.0);
+		covGrad.setzero();
+		meanGrad.setzero();
+		#pragma omp parallel for num_threads(CommonUtility::numThreads) 
+		for(int n=0; n<this->numSamples; n++)
+			this->gradient(n,constantGrad, meanGrad, covGrad);
+    	gettimeofday(&finish,nullptr) ; // pause timer 
+		history.iterTime[t+1] = finish.tv_sec - start.tv_sec;     
+    	history.iterTime[t+1] += (finish.tv_usec-start.tv_usec)/(1000.0 * 1000.0); 
+		//accounting for size of gradient
+		history.gradNormSq[t] = this->l2normsq(meanGrad,covGrad,constantGrad);
+		std::cout << "squared l2-norm of gradient after " << t
+				<<" iterations of APG: " << history.gradNormSq[t] << std::endl;
+		gettimeofday(&start,nullptr) ; // resume timer
+
+		// update x iterates
+		classConstants_x = classConstants_x_new;		
+		mean_x = mean_x_new;
+		cov_x = cov_x_new;
+		for(int k=0; k<this->numClass; k++)
+			classConstants_x_new[k] = this->classConstants[k]-stepsize*constantGrad[k];
+		meanGrad *= stepsize;
+		mean_x_new = this->means-meanGrad;
+		covGrad *= stepsize;
+		cov_x_new = this->covCholeskey-covGrad;
+		// update v iterates
+		for(int k=0; k<this->numClass; k++)
+			classConstants_v[k] = classConstants_x_new[k] 
+					+ (classConstants_x_new[k]-classConstants_x[k]) * momentum;
+		mean_v = mean_x_new + (mean_x_new - mean_x) * momentum;
+		cov_v = cov_x_new + (cov_x_new - cov_x) * momentum;
+		//compare NLL
+		double nll_x = this->negativeLogLik(classConstants_x_new, mean_x_new, 
+				cov_x_new, CommonUtility::numThreads);	
+		double nll_v = this->negativeLogLik(classConstants_v, mean_v, 
+				cov_v, CommonUtility::numThreads);
+    	gettimeofday(&finish,nullptr) ; // set timer finish      
+		history.iterTime[t+1] += finish.tv_sec - start.tv_sec;     
+    	history.iterTime[t+1] += (finish.tv_usec-start.tv_usec)/(1000.0 * 1000.0);   
+		history.iterTime[t+1] += history.iterTime[t];
+
+		/***********************************************************************/	
+		/***** choosing iteraties and accounting for optimization **************/
+		if (nll_x <= nll_v)
+		{
+			history.nll[t+1] = nll_x; 
+			std::cout << "NLL after " << t+1 << " iterations of APG: "
+					<< history.nll[t+1] << std::endl;	
+			double change = l2normsq(this->means, this->covCholeskey, 
+					this->classConstants, mean_x_new, cov_x_new, classConstants_x_new);	
+			history.paramChange[t+1] = sqrt(change);						
+			std::cout << "change of parameters in l2-norm in " << t+1 << " iteration: "
+					<< history.paramChange[t+1] << std::endl;	
+		
+			this->classConstants = classConstants_x_new;
+			this->means = mean_x_new;
+			this->covCholeskey = cov_x_new;
+			momentum *= momentumShrinkage;
+
+		} else 
+		{
+			history.nll[t+1] = nll_v; 
+			std::cout << "NLL after " << t+1 << " iterations of APG: "
+					<< history.nll[t+1] << std::endl;	
+			double change = l2normsq(this->means, this->covCholeskey, 
+					this->classConstants, mean_v, cov_v, classConstants_v);	
+			history.paramChange[t+1] = sqrt(change);	
+			std::cout << "change in l2-norm in " << t+1 << " iteration: "
+					<< history.paramChange[t+1] << std::endl;	
+
+			this->classConstants = classConstants_v;
+			this->means = mean_v;
+			this->covCholeskey = cov_v;
+			momentum = (momentum/(momentumShrinkage) < 1 ? momentum/(momentumShrinkage): 1);
+		}
+		/***********************************************************************/	
+	}
+	
+	history.gradNormSq[maxIter] = this->gradNormSq(meanGrad, covGrad,
+			constantGrad, CommonUtility::numSecondaryThreads);
+	std::cout << "squared l2-norm of gradient after " << maxIter
+			<<" iterations of APG: " << history.gradNormSq[maxIter] << std::endl;
+
+} //fit_by_APG
 
 
 double MxlGaussianBlockDiag::l2normsq(const ClassMeans &mean1,
-									const BlockCholeskey &cov1,
-									const std::vector<double> &constants1, 
-									const ClassMeans &mean2,
-									const BlockCholeskey &cov2,
-									const std::vector<double> &constants2) const
+		const BlockCholeskey &cov1,
+		const std::vector<double> &constants1, 
+		const ClassMeans &mean2,
+		const BlockCholeskey &cov2,
+		const std::vector<double> &constants2) const
 {
 	
 	double norm = 0.0;
@@ -438,4 +616,21 @@ double MxlGaussianBlockDiag::l2normsq(const ClassMeans &mean1,
 	norm += mean1.l2normsq();
 
 	return norm;
+}
+
+
+double MxlGaussianBlockDiag::gradNormSq(ClassMeans &meanGrad,
+										BlockCholeskey &covGrad,
+										std::vector<double> &constantGrad,
+										int numThreads) 
+{
+	std::fill(constantGrad.begin(), constantGrad.end(), 0.0);
+	covGrad.setzero();
+	meanGrad.setzero();
+	#pragma omp parallel for num_threads(numThreads) 
+	for(int n=0; n<this->numSamples; n++)
+		this->gradient(n,constantGrad, meanGrad, covGrad);
+	
+	double gradnorm = this->l2normsq(meanGrad,covGrad,constantGrad);
+	return gradnorm;
 }

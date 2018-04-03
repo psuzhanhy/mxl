@@ -7,6 +7,9 @@
 #include "param.h"
 #include "matvec.h"
 #include "mxl.h"
+#include "common.h"
+#include "opthistory.h"
+
 
 class MxlGaussianBlockDiag : public MixedLogit 
 {
@@ -23,16 +26,30 @@ class MxlGaussianBlockDiag : public MixedLogit
 		MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 				int numclass, int dim, bool zeroinit,int numdraws);
 
-		double negativeLogLik();
+		double negativeLogLik(const std::vector<double> &classConstants,
+	    		const ClassMeans &means,
+				const BlockCholeskey &covCholeskey,
+				int numThreads);
 
-		void propensityFunction(int sampleID, 
-				const std::vector<double> &normalDraws,
+		double negativeLogLik() 
+		{
+			return negativeLogLik(classConstants, means, 
+					covCholeskey, CommonUtility::numSecondaryThreads);
+		}
+
+		void propensityFunction(const std::vector<double> &classConstants,
+	    		const ClassMeans &means, const BlockCholeskey &covCholeskey,
+	 			int sampleID, const std::vector<double> &normalDraws,
 				std::vector<double> &classPropensity);
 
 		void multinomialProb(const std::vector<double> &propensityScore, 
 				std::vector<double> &mnProb);
 
-		void simulatedProbability(int sampleID, 
+		void simulatedProbability(
+				const std::vector<double> &classConstants,
+				const ClassMeans &means,
+				const BlockCholeskey &covCholeskey,
+				int sampleID, 
 				const std::vector<double> &normalrv, 
 				std::vector<double> &simProb);
 
@@ -42,7 +59,12 @@ class MxlGaussianBlockDiag : public MixedLogit
 		void gradient(int sampleID, std::vector<double> &constantGrad,
 				ClassMeans &meanGrad, BlockCholeskey &covGrad);
 
-		void fit(double stepsize, double scalar, int maxEpochs);
+		void fit_by_SGD(double stepsize, double scalar, 
+				int maxEpochs, OptHistory &history);
+
+		void fit_by_APG(double stepsize, double momentum, 
+				double momentumShrinkage, int maxIter,
+				OptHistory &history);
 
 		double l2normsq(const ClassMeans &mean1,
 				const BlockCholeskey &cov1,
@@ -54,6 +76,13 @@ class MxlGaussianBlockDiag : public MixedLogit
 		double l2normsq(const ClassMeans &mean1,
 				const BlockCholeskey &cov1,
 				const std::vector<double> &constants1) const;
+
+
+		double gradNormSq(ClassMeans &meanGrad,
+				BlockCholeskey &covGrad,
+				std::vector<double> &constantGrad,
+				int numThreads);
+
 				
 		BlockCholeskey getCovCholeskey() {return this->covCholeskey;}
 
