@@ -55,13 +55,17 @@ void CSR_matrix::rowOuterProduct2LowerTri(int rowID,
     for(int i=this->row_offset[rowID] ; i<this->row_offset[rowID+1]; i++)
     {
         for(int j=lowerTriCSR.row_offset[col[i]]; j<lowerTriCSR.row_offset[col[i]+1]; j++)
-            lowerTriCSR.val[j] += this->val[i] * denseRightVec[start+lowerTriCSR.col[j]];
+		{
+			double increment = this->val[i] * denseRightVec[start+lowerTriCSR.col[j]];
+			#pragma omp atomic
+            lowerTriCSR.val[j] += increment;
+		}
     }
 }
 
 
 double CSR_matrix::quadraticForm(const CSR_matrix &leftMat, int rowID, 
-		const std::vector<double> &denseRightVec, int start, int end)
+		const std::vector<double> &denseRightVec, int start, int end) const
 {
 	/*
 	compute quadratic form x' M y 

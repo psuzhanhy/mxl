@@ -26,7 +26,7 @@ struct CSR_matrix
 			int start, int end, CSR_matrix &lowerTriCSR);	
 	
 	double quadraticForm(const CSR_matrix &leftMat, int rowID, 
-			const std::vector<double> &denseRightVec, int start, int end);
+			const std::vector<double> &denseRightVec, int start, int end) const;
 };
 
 
