@@ -354,7 +354,8 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
         /* update gradient with respect to mean */
         for(int i= this->xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++) 
 		{
-        	increment =  summationTerm[k]/(probSAA * this->R * this->numSamples) * xfeature.val[i];
+        	increment =  summationTerm[k]/(probSAA * this->R * this->numSamples) 
+					* xfeature.val[i];
 			#pragma omp atomic
 			meanGrad.meanVectors[k][xfeature.col[i]] += increment;
 		}
@@ -439,7 +440,7 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize, double scalar,
 		} //pragma omp parallel
 		
 		/***********************************************************************/	
-		/***************** accounting for optimization *************************/
+		/***************** record optimization progress ************************/
     	gettimeofday(&finish,nullptr) ; // set timer finish      
 		history.iterTime[t+1] = finish.tv_sec - start.tv_sec;     
     	history.iterTime[t+1] += (finish.tv_usec-start.tv_usec)/(1000.0 * 1000.0);   
@@ -539,7 +540,7 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 		history.iterTime[t+1] += history.iterTime[t];
 
 		/***********************************************************************/	
-		/***** choosing iteraties and accounting for optimization **************/
+		/***** choosing iteraties and record optimization progress *************/
 		if (nll_x <= nll_v)
 		{
 			history.nll[t+1] = nll_x; 
