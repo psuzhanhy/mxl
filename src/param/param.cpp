@@ -451,3 +451,10 @@ Beta Beta::operator* (double scalar)
 
 	return res;
 }
+
+
+void Beta::setzero()
+{
+	for (int k=0; k<this->numClass-1; k++)
+		std::fill(this->beta[k].begin(), this->beta[k].end(), 0.0);
+}

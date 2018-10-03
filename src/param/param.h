@@ -55,7 +55,7 @@ struct Beta: public LogisticParam
 	Beta operator+ (Beta const &otherBeta) const;
 	Beta& operator*= (double scalar);
 	Beta operator* (double scalar);	
-
+	void setzero();
 };
 
 

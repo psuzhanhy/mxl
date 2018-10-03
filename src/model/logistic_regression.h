@@ -14,7 +14,7 @@
 class LogisticRegression : public Logistic 
 {
     private:
-        ClassMeans _beta;
+        Beta _beta;
         std::vector<double> _intercept;
 
     public:
@@ -24,11 +24,11 @@ class LogisticRegression : public Logistic
         void multinomialProb(int sampleID, std::vector<double> &classProb, 
             Beta &beta, std::vector<double>& intercept);
 
- 		void fit_by_SGD(double initStepSize, int maxEpochs, OptHistory &history);  
+ 		void fit_by_SGD(double initStepSize, int batchSize, int maxIter, OptHistory &history);  
 
+		virtual double negativeLogLik() override;
 
-             
-        
+        double negativeLogLik(Beta& beta, std::vector<double> &intercept);
 
 };
 
