@@ -11,7 +11,7 @@
 #include "boxmuller.hpp"
 #include "matvec.h"
 #include "param.h"
-#include "mxl.h"
+#include "logistic.h"
 #include "mxl_gaussblockdiag.h"
 #include "common.h"
 #include "opthistory.h"
@@ -19,7 +19,7 @@
 
 MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 		int numclass, int dim, bool zeroinit, int numdraws): 
-		MixedLogit(xf,lbl,numclass,dim), 
+		Logistic(xf,lbl,numclass,dim), 
 		means(numclass, dim, zeroinit),
 		covCholeskey(numclass, dim, zeroinit),
 		classConstants(numclass),
@@ -459,7 +459,15 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize, double scalar,
 	
 		history.nll[t+1] = this->negativeLogLik();
 		std::cout << "NLL after " << t+1 << " iterations of SGD: " 
-				<< history.nll[t+1] << std::endl;	
+				<< history.nll[t+1] << std::endl;
+
+		//TODO
+		std::cout << this->testRay(this->classConstants, this->means, 
+				this->covCholeskey,10, CommonUtility::numThreads) << std::endl;
+
+		double paramNorm = this->l2normsq(this->means, this->covCholeskey, 
+				this->classConstants);
+		std::cout << paramNorm << std::endl;
 		/***********************************************************************/	
 	}	
 } //MxlGaussianBlockDiag::fit_by_SGD
@@ -573,7 +581,15 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 			this->covCholeskey = cov_v;
 			momentum = (momentum/(momentumShrinkage) < 1 ? momentum/(momentumShrinkage): 1);
 		}
-		/***********************************************************************/	
+		/***********************************************************************/
+		//TODO
+		std::cout << this->testRay(this->classConstants, this->means, 
+				this->covCholeskey,10, CommonUtility::numThreads) << std::endl;
+
+		double paramNorm = this->l2normsq(this->means, this->covCholeskey, 
+				this->classConstants);
+		std::cout << paramNorm << std::endl;
+	
 	}
 	
 	history.gradNormSq[maxIter] = this->gradNormSq(meanGrad, covGrad,
@@ -635,3 +651,89 @@ double MxlGaussianBlockDiag::gradNormSq(ClassMeans &meanGrad,
 	double gradnorm = this->l2normsq(meanGrad,covGrad,constantGrad);
 	return gradnorm;
 }
+
+
+std::vector<int> MxlGaussianBlockDiag::insamplePrediction(const std::vector<double> &constants1,
+		const ClassMeans &mean1,
+		const BlockCholeskey &cov1)
+{
+
+	std::vector<int> fitlabel(this->numSamples);
+	#pragma omp parallel num_threads(CommonUtility::numSecondaryThreads)
+	{
+	int rvdim = this->numClass * this->R * this->dimension;
+	//normal(0,1) draws for sampleID
+	std::vector<double> normalrv(rvdim);
+
+	CommonUtility::CBRNG g;
+	CommonUtility::CBRNG::ctr_type ctr = {{}};
+    CommonUtility::CBRNG::key_type key = {{}};	
+	key[0] = CommonUtility::time_start_int;//seed	
+	#pragma omp for  
+	for(int n=0; n<this->numSamples; n++)
+	{
+		ctr[0] = n;		
+		for(int i=0; i<rvdim/2; i++)
+		{
+			ctr[1] = i;
+        	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
+			auto nr = r123::boxmuller(unidrand[0], unidrand[1]);	
+			normalrv[2*i] = nr.x;
+			normalrv[2*i+1] = nr.y;			
+		}
+		ctr[1] = rvdim/2;
+        CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
+		auto nr = r123::boxmuller(unidrand[0], unidrand[1]);
+		normalrv[rvdim-1] = nr.x;
+	
+		std::vector<double> probSim(this->R * this->numClass);
+		//populate probSim 
+		this->simulatedProbability(constants1, mean1, 
+				cov1, n,normalrv, probSim);
+ 
+		std::vector<double> probSAA(this->numClass,0.0);
+		for(int r=0; r<this->R; r++)
+		{
+			for(int k=0; k<this->numClass; k++)
+				probSAA[k] += probSim[r*this->numClass+k];
+		}
+		int maxclass = this->label[n];
+		double maxprob = probSAA[maxclass];
+		for(int k=0; k<this->numClass; k++)
+		{
+			if (probSAA[k]>maxprob)
+			{
+				maxclass = k;
+				maxprob = probSAA[k];
+			}
+		}
+		fitlabel[n] = maxclass;	
+	} // pragma omp for 
+	} //pragma omp parallel num_threads
+	return fitlabel;
+} //MxlGaussianBlockDiag::insamplePrediction
+
+
+std::vector<int> MxlGaussianBlockDiag::insamplePrediction() 
+{
+	return this->insamplePrediction(this->classConstants, this->means,this->covCholeskey);
+}
+
+
+double MxlGaussianBlockDiag::testRay(
+		const std::vector<double> &classConstants,
+	    const ClassMeans &means,
+		const BlockCholeskey &covCholeskey, 
+		int scalar,int numThreads) 
+{
+	std::vector<double> constants1(this->numClass);
+	for(int k=0; k<this->numClass; k++)
+		constants1[k] = scalar * classConstants[k];
+	ClassMeans means1(means);
+	BlockCholeskey cov1(covCholeskey);
+	means1 *= scalar;
+	cov1 *= scalar;
+	double nll =this->negativeLogLik(constants1, means1, cov1, numThreads);
+	return nll;
+}
+

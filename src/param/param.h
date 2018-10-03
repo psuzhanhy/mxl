@@ -6,15 +6,15 @@
 #include "matvec.h"
 
 
-struct MxLParam
+struct LogisticParam
 {
 	int numClass;
 	int dimension;
-	MxLParam(int numclass, int dim): numClass(numclass), dimension(dim) {} 
-	virtual ~MxLParam(){};
+	LogisticParam(int numclass, int dim): numClass(numclass), dimension(dim) {} 
+	virtual ~LogisticParam(){};
 };
 
-struct BlockCholeskey: public MxLParam
+struct BlockCholeskey: public LogisticParam
 {
 	std::vector<CSR_matrix> factorArray;
 	BlockCholeskey(int numclass, int dim, bool zeroinit); 
@@ -30,7 +30,7 @@ struct BlockCholeskey: public MxLParam
 	
 };
 
-struct ClassMeans: public MxLParam
+struct ClassMeans: public LogisticParam
 {
 	std::vector<std::vector<double> > meanVectors;
     ClassMeans(int numclass, int dim, bool zeroinit);
@@ -45,6 +45,18 @@ struct ClassMeans: public MxLParam
 
 };
 
+struct Beta: public LogisticParam
+{
+	std::vector<std::vector<double>> beta;
+	Beta(int numclass, int dim, bool zeroinit);
+	~Beta() {}
+	Beta& operator-= (Beta const& otherBeta);
+	Beta operator- (Beta const &otherBeta) const;
+	Beta operator+ (Beta const &otherBeta) const;
+	Beta& operator*= (double scalar);
+	Beta operator* (double scalar);	
+
+};
 
 
 #endif

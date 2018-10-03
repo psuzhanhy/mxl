@@ -9,7 +9,7 @@
 #include "param.h"
 #include "common.h"
 
-BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): MxLParam(numclass, dim) 
+BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): LogisticParam(numclass, dim) 
 {
 	CommonUtility::CBRNG g;
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
@@ -190,7 +190,7 @@ bool BlockCholeskey::operator== (BlockCholeskey const &bcholRHS)
 
 
 
-ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): MxLParam(numclass, dim)  
+ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): LogisticParam(numclass, dim)  
 {
 	CommonUtility::CBRNG g;
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
@@ -284,7 +284,6 @@ ClassMeans ClassMeans::operator- (ClassMeans const &clmsRHS) const
 }
 
 
-
 ClassMeans ClassMeans::operator+ (ClassMeans const &clmsRHS) const
 {
 	try{
@@ -307,7 +306,6 @@ ClassMeans ClassMeans::operator+ (ClassMeans const &clmsRHS) const
 }
 
 
-
 ClassMeans& ClassMeans::operator*= (double scalar)
 {
 	for(int k=0; k<this->numClass; k++)
@@ -327,6 +325,128 @@ ClassMeans ClassMeans::operator* (double scalar)
 	{
 		for(int j=0; j<this->dimension; j++)
 			res.meanVectors[k][j] *= scalar;
+	}
+
+	return res;
+}
+
+
+Beta::Beta(int numclass, int dim, bool zeroinit): LogisticParam(numclass, dim)  
+{
+	CommonUtility::CBRNG g;
+	CommonUtility::CBRNG::ctr_type ctr = {{}};
+    CommonUtility::CBRNG::key_type key = {{}};	
+	key[0] = static_cast<int> (time(nullptr));//seed
+	std::vector<double> row;
+	for (int i=0; i<numClass-1; i++) //loop goes from 0 to numClass-1, standardized with class K
+	{
+		beta.push_back(row);
+		if (zeroinit)
+		{
+			for(int j=0; j<dimension; j++)
+				beta[i].push_back(0);
+		}
+		else 
+		{
+			for(int j=0; j<dimension; j++)
+			{
+				ctr[0] = i;
+				ctr[1] = j;	
+        		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
+				double x = r123::uneg11<double>(unidrand[0]);	
+				beta[i].push_back(0.5*(x+1.0));
+			}
+		}
+	} 
+}
+
+
+Beta& Beta::operator-= (Beta const& otherBeta)
+{
+
+	try{
+		if (this->numClass != otherBeta.numClass)
+			throw "numClass in LHS and RHS does not match\n";
+		if (this->dimension != otherBeta.dimension)
+			throw "dimension in LHS and RHS does not match\n";
+	} catch (const char* msg) {
+		std::cout << msg << std::endl;
+	}
+
+	for(int k=0; k<this->numClass-1; k++)
+	{
+		for(int j=0; j<this->dimension; j++)
+			this->beta[k][j] -= otherBeta.beta[k][j];
+	}
+
+	return *this;
+
+}
+
+
+Beta Beta::operator- (Beta const &otherBeta) const
+{
+	try{
+		if (this->numClass != otherBeta.numClass)
+			throw "numClass in LHS and RHS does not match\n";
+		if (this->dimension != otherBeta.dimension)
+			throw "dimension in LHS and RHS does not match\n";
+	} catch (const char* msg) {
+		std::cout << msg << std::endl;
+	}
+
+	Beta res(*this);
+	for(int k=0; k<res.numClass-1; k++)
+	{
+		for(int j=0; j<res.dimension; j++)
+			res.beta[k][j] -= otherBeta.beta[k][j];
+	}
+
+	return res;
+}
+
+
+Beta Beta::operator+ (Beta const &otherBeta) const
+{
+	try{
+		if (this->numClass != otherBeta.numClass)
+			throw "numClass in LHS and RHS does not match\n";
+		if (this->dimension != otherBeta.dimension)
+			throw "dimension in LHS and RHS does not match\n";
+	} catch (const char* msg) {
+		std::cout << msg << std::endl;
+	}
+
+	Beta res(*this);
+	for(int k=0; k<res.numClass-1; k++)
+	{
+		for(int j=0; j<res.dimension; j++)
+			res.beta[k][j] += otherBeta.beta[k][j];
+	}
+
+	return res;
+}
+
+
+Beta& Beta::operator*= (double scalar)
+{
+	for(int k=0; k<this->numClass-1; k++)
+	{
+		for(int j=0; j<this->dimension; j++)
+			this->beta[k][j] *= scalar;
+	}
+
+	return *this;
+}
+
+
+Beta Beta::operator* (double scalar)
+{
+	Beta res(*this);
+	for(int k=0; k<this->numClass-1; k++)
+	{
+		for(int j=0; j<this->dimension; j++)
+			res.beta[k][j] *= scalar;
 	}
 
 	return res;

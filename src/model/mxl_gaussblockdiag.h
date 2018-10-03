@@ -6,12 +6,13 @@
 #include <sys/time.h>
 #include "param.h"
 #include "matvec.h"
-#include "mxl.h"
+#include "logistic.h"
 #include "common.h"
+
 #include "opthistory.h"
 
 
-class MxlGaussianBlockDiag : public MixedLogit 
+class MxlGaussianBlockDiag : public Logistic 
 {
 	
 	private:
@@ -83,7 +84,18 @@ class MxlGaussianBlockDiag : public MixedLogit
 				std::vector<double> &constantGrad,
 				int numThreads);
 
-				
+
+		std::vector<int> insamplePrediction(const std::vector<double> &constants1,
+				const ClassMeans &mean1,
+				const BlockCholeskey &cov1);
+		
+		std::vector<int> insamplePrediction();
+
+		double testRay(const std::vector<double> &classConstants,
+					const ClassMeans &means,
+					const BlockCholeskey &covCholeskey, 
+					int scarlar,int numThreads); 
+
 		BlockCholeskey getCovCholeskey() {return this->covCholeskey;}
 
 };
