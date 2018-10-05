@@ -1,11 +1,13 @@
 CXX = g++
 CXXFLAGS = -std=c++11 -fopenmp -O3 -flto -I src/utility/ -I src/model/ -I src/param/ -I Random123/include/ -I Random123/examples/
 
-main: testing/testgmxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
-	$(CXX) $(CXXFLAGS) -o main testing/testgmxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
+all: testlr testmxl 
 
-testgmxl.o: testing/testgmxl.cpp 
-	$(CXX) $(CXXFLAGS) -c testing/testgmxl.cpp
+testlr: testing/test_logistic_regression.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
+	$(CXX) $(CXXFLAGS) -o testlr testing/test_logistic_regression.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
+
+testmxl: testing/test_mxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o
+	$(CXX) $(CXXFLAGS) -o testmxl testing/test_mxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o
 
 matvec.o: src/param/matvec.cpp 
 	$(CXX) $(CXXFLAGS) -c src/param/matvec.cpp 

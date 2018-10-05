@@ -24,7 +24,12 @@ class LogisticRegression : public Logistic
         void multinomialProb(int sampleID, std::vector<double> &classProb, 
             Beta &beta, std::vector<double>& intercept);
 
- 		void fit_by_SGD(double initStepSize, int batchSize, int maxIter, OptHistory &history);  
+        void stochasticGradient(int sampleID, 
+                Beta& beta, std::vector<double> &intercept,
+                Beta& betaGrad, std::vector<double> &interceptGrad);
+                
+ 		void fit_by_SGD(double initStepSize, int batchSize, int maxIter, 
+                OptHistory &history, bool writeHistory);  
 
 		virtual double negativeLogLik() override;
 

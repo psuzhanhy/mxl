@@ -458,3 +458,15 @@ void Beta::setzero()
 	for (int k=0; k<this->numClass-1; k++)
 		std::fill(this->beta[k].begin(), this->beta[k].end(), 0.0);
 }
+
+
+double Beta::l2normsq() const
+{
+	double norm = 0.0;
+	for(int k=0; k<this->numClass-1; k++)
+	{
+		for(int i=0; i<this->beta[k].size(); i++)
+			norm += this->beta[k][i]*this->beta[k][i];
+	}
+	return norm;
+}

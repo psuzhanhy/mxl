@@ -54,7 +54,7 @@ LogisticRegression::LogisticRegression(CSR_matrix xf, std::vector<int> lbl,
 
 
 void LogisticRegression::multinomialProb(int sampleID, std::vector<double> &classProb, 
-            Beta &beta, std::vector<double>& intercept)  
+            Beta &beta, std::vector<double>& intercept) 
 {
 	/*
 	 * compute multinomial probabilities
@@ -87,22 +87,60 @@ void LogisticRegression::multinomialProb(int sampleID, std::vector<double> &clas
 double LogisticRegression::negativeLogLik(Beta& beta, std::vector<double> &intercept)
 {
 	/* return negative LogLikelihood */
-	std::vector<double> 
+	std::vector<double> classProb(numClass);
+	double nll = 0.0;
 	for(int n=0; n<this->numSamples; n++)
 	{
+		this->multinomialProb(n, classProb, beta, intercept);
+		nll -= log(classProb[this->label[n]]);
+	}
+	return nll;
+}
 
+
+double LogisticRegression::negativeLogLik() 
+{
+	return negativeLogLik(this->_beta, this->_intercept);
+}
+
+
+void LogisticRegression::stochasticGradient(int sampleID, 
+		Beta& beta, std::vector<double> &intercept,
+		Beta& betaGrad, std::vector<double> &interceptGrad)  
+{
+	/* compute stochastic gradient using sampleID w.r.t beta and intercept */
+	std::vector<double> classProb(numClass);	
+	this->multinomialProb(sampleID, classProb, beta, intercept);
+	for(int k=0; k<numClass-1; k++)
+	{
+		double lbl = (label[sampleID]==k ? 1.0 : 0.0);
+		double coeff =  classProb[k] - lbl;
+		interceptGrad[k] = coeff;
+		for(int i=xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++) 
+			betaGrad.beta[k][xfeature.col[i]] += coeff * xfeature.val[i];
 	}
 }
 
 
 void LogisticRegression::fit_by_SGD(double initStepSize, int batchSize, 
-		int maxIter, OptHistory &history)
+		int maxIter, OptHistory &history, bool writeHistory)
 {
+	// working variables
 	Beta betaTemp(this->_beta);
 	Beta betaGrad(numClass, dimension, true);
 	std::vector<double> interceptTemp(this->_intercept);
 	std::vector<double> interceptGrad(numClass-1,0.0);
-	double stepsize = initStepSize;
+	// opt initialization 
+	if (writeHistory)
+	{
+		history.nll[0] = this->negativeLogLik();
+		for(int n=0; n<numSamples; n++)
+			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
+		history.gradNormSq[0] += betaGrad.l2normsq();
+		for(int k=0; k<numClass-1; k++)
+			history.gradNormSq[0] += interceptGrad[k]*interceptGrad[k];
+	}	
+	double stepsize = initStepSize;	
 	// random generator
 	CommonUtility::CBRNG g;
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
@@ -110,7 +148,6 @@ void LogisticRegression::fit_by_SGD(double initStepSize, int batchSize,
 	key[0] = CommonUtility::time_start_int;//seed		
 	for(int t=0; t<maxIter; t++)
 	{
-		std::vector<double> classProb(numClass);	
 		std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
 		betaGrad.setzero();
 		// sample selection and batch gradient
@@ -123,25 +160,28 @@ void LogisticRegression::fit_by_SGD(double initStepSize, int batchSize,
 			double x = r123::uneg11<double>(unidrand[0]);
 			//discretized range
 			int r = 0.5 * (x + 1.0) * (this->numSamples-1);
-			this->multinomialProb(r, classProb, betaTemp, interceptTemp);
-			for(int k=0; k<numClass-1; k++)
-			{
-				double lbl = (label[r]==k ? 1.0 : 0.0);
-				double coeff =  classProb[k] - lbl;
-				interceptGrad[k] = coeff;
-				for(int i=xfeature.row_offset[r]; i<xfeature.row_offset[r+1];i++) 
-					betaGrad.beta[k][xfeature.col[i]] += coeff * xfeature.val[i];
-			}
+			stochasticGradient(r, betaTemp, interceptTemp, betaGrad, interceptGrad);
 		}		
 		// averaging and increment
 		stepsize = initStepSize/(t+1);
-		for(int k=0; k<numClass; k++)
+		for(int k=0; k<numClass-1; k++)
 		{
-			interceptGrad[k] *= (1/batchSize);
+			interceptGrad[k] *= (1.0/batchSize);
 			interceptTemp[k] -= stepsize * interceptGrad[k];
 		}
-		betaGrad *= (1/batchSize) * stepsize;
-		betaTemp -= betaGrad;
+		betaGrad *= (1.0/batchSize);
+		betaTemp -= betaGrad * stepsize;
+		if (writeHistory)
+		{
+			history.nll[t+1] = this->negativeLogLik(betaTemp, interceptTemp);
+			std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
+			betaGrad.setzero();			
+			for(int n=0; n<numSamples; n++)
+				stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
+			history.gradNormSq[t+1] += betaGrad.l2normsq();
+			for(int k=0; k<numClass-1; k++)
+				history.gradNormSq[t+1] += interceptGrad[k]*interceptGrad[k];
+		}
 	}	
 	this->_beta = betaTemp;
 	this->_intercept = interceptTemp;
