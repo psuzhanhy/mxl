@@ -387,8 +387,8 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize, double scalar,
     CommonUtility::CBRNG::key_type key = {{}};	
 	key[0] = CommonUtility::time_start_int;//seed	
 
-	history.nll[0] = this->negativeLogLik(); 
-	std::cout << "intial NLL " << history.nll[0] << std::endl;	
+	history.fobj[0] = this->negativeLogLik(); 
+	std::cout << "intial NLL " << history.fobj[0] << std::endl;	
 	history.gradNormSq[0] = this->gradNormSq(meanGrad, covGrad,
 			constantGrad, CommonUtility::numSecondaryThreads);
 	std::cout << "Initial squared l2-norm of gradient: " 
@@ -457,9 +457,9 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize, double scalar,
 		std::cout << "change of parameters in l2-norm in " << t+1 << " iteration: "
 				<< history.paramChange[t+1] << std::endl;		
 	
-		history.nll[t+1] = this->negativeLogLik();
+		history.fobj[t+1] = this->negativeLogLik();
 		std::cout << "NLL after " << t+1 << " iterations of SGD: " 
-				<< history.nll[t+1] << std::endl;
+				<< history.fobj[t+1] << std::endl;
 
 		//TODO
 		std::cout << this->testRay(this->classConstants, this->means, 
@@ -498,8 +498,8 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
     CommonUtility::CBRNG::key_type key = {{}};	
 	key[0] = CommonUtility::time_start_int;//seed	
 
-	history.nll[0] = this->negativeLogLik(); 
-	std::cout << "intial NLL " << history.nll[0] << std::endl;	
+	history.fobj[0] = this->negativeLogLik(); 
+	std::cout << "intial NLL " << history.fobj[0] << std::endl;	
 	struct timeval start, finish;
 	/***************************************************************************/
 	/********************* start APG *******************************************/	
@@ -551,9 +551,9 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 		/***** choosing iteraties and record optimization progress *************/
 		if (nll_x <= nll_v)
 		{
-			history.nll[t+1] = nll_x; 
+			history.fobj[t+1] = nll_x; 
 			std::cout << "NLL after " << t+1 << " iterations of APG: "
-					<< history.nll[t+1] << std::endl;	
+					<< history.fobj[t+1] << std::endl;	
 			double change = l2normsq(this->means, this->covCholeskey, 
 					this->classConstants, mean_x_new, cov_x_new, classConstants_x_new);	
 			history.paramChange[t+1] = sqrt(change);						
@@ -567,9 +567,9 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 
 		} else 
 		{
-			history.nll[t+1] = nll_v; 
+			history.fobj[t+1] = nll_v; 
 			std::cout << "NLL after " << t+1 << " iterations of APG: "
-					<< history.nll[t+1] << std::endl;	
+					<< history.fobj[t+1] << std::endl;	
 			double change = l2normsq(this->means, this->covCholeskey, 
 					this->classConstants, mean_v, cov_v, classConstants_v);	
 			history.paramChange[t+1] = sqrt(change);	

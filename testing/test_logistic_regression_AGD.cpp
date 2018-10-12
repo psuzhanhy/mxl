@@ -9,6 +9,7 @@
 #include <string>
 #include "matvec.h"
 #include "logistic_regression.h"
+#include "param.h"
 #include "readinput.h"
 #include "opthistory.h"
 
@@ -22,30 +23,38 @@ int main(int argc, char **argv)
     input_filename = argv[optind];		
     ReadDenseInput(input_filename, &data);   
 	CSR_matrix xf = Dense2CSR(data);
+	int p=xf.number_cols;
+	double l1Lambda = 0.001;
 
 	LogisticRegression lr = LogisticRegression(xf, data.label, 
-            numclass, xf.number_cols, true);
+            numclass, p, l1Lambda, false);
 
-	double stepsize = 0.001 * xf.number_rows;
-    int batchSize = 512;
-	int maxIter = 1000;
+	double stepsize = 1;
+	int maxIter = 10000;
    
-	OptHistory sgdHistory(maxIter); 
+	OptHistory optHistory(maxIter); 
 	bool writeHistory = true;
-	lr.fit_by_SGD(stepsize, batchSize, maxIter, sgdHistory, writeHistory);	
+	lr.fit_by_AGD(stepsize, maxIter, optHistory, writeHistory);	
     
 	char outfilestr[200];
-    sprintf (outfilestr, "testlr_result.txt");
+    sprintf (outfilestr, "testlr_fitAGD.txt");
 
 	std::ofstream ofs;
 	ofs.open(outfilestr,std::ofstream::out | std::ofstream::app);
-	for(int t=0; t<sgdHistory.nll.size(); t++)
+	for(int t=0; t<optHistory.fobj.size(); t++)
 	{
-		ofs << sgdHistory.nll[t] << "," << sgdHistory.gradNormSq[t] << ","
-			<< sgdHistory.paramChange[t] << "," << sgdHistory.iterTime[t] << std::endl;
+		ofs << optHistory.fobj[t] << "," << optHistory.gradNormSq[t] << ","
+			<< optHistory.paramChange[t] << "," << optHistory.iterTime[t] << std::endl;
 
 	}
 	ofs.close();
     
+	Beta betafit = lr.getBeta();
+	for(int k=0; k<numclass-1; k++)
+	{
+		for(int i=0; i<p ;i++)
+			std::cout << betafit.beta[k][i] << " ";
+		std::cout << std::endl;
+	}
 	return 0;
 }

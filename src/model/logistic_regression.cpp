@@ -15,13 +15,14 @@
 #include "logistic_regression.h"
 #include "common.h"
 #include "opthistory.h"
-
+#include <math.h>
 
 LogisticRegression::LogisticRegression(CSR_matrix xf, std::vector<int> lbl, 
-        int numclass, int dim, bool zeroinit): 
+        int numclass, int dim, double l1Lambda, bool zeroinit): 
         Logistic(xf,lbl,numclass,dim),
         _beta(numclass, dim, zeroinit),
-		_intercept(numClass-1, 0.0)
+		_intercept(numClass-1, 0.0),
+		_l1Lambda(l1Lambda)
 {
 	/*	
 	*	ctor for LogisticRegression class
@@ -51,6 +52,26 @@ LogisticRegression::LogisticRegression(CSR_matrix xf, std::vector<int> lbl,
 	}
 
 } // end of ctor
+
+
+void LogisticRegression::setL1Lambda(double l1Lambda)
+{
+	this->_l1Lambda = l1Lambda;
+}
+
+
+Beta LogisticRegression::getBeta()
+{
+	Beta betaCopy(this->_beta);
+	return betaCopy;
+} 
+
+
+std::vector<double> LogisticRegression::getIntercept()
+{
+	std::vector<double> interceptCopy(this->_intercept);
+	return interceptCopy;
+}
 
 
 void LogisticRegression::multinomialProb(int sampleID, std::vector<double> &classProb, 
@@ -104,20 +125,87 @@ double LogisticRegression::negativeLogLik()
 }
 
 
+double LogisticRegression::l1Regularizer(Beta& beta) const
+{
+	double penaltyval = 0.0;
+	for(int k=0; k<this->numClass-1; k++)
+	{
+		for(int i=0; i<dimension; i++)
+			penaltyval += this->_l1Lambda * fabs(beta.beta[k][i]);
+	}
+	return penaltyval;
+}
+
+
+double LogisticRegression::objValue(Beta& beta, std::vector<double> &intercept)
+{
+	/* 
+	return obj vaue loss = 1/n * sum loss(x_i,y_i; beta, intercept)  + l1lambda * R(beta) 
+	*/
+	double fobjval = negativeLogLik(beta, intercept)/this->numSamples;
+	if(this->_l1Lambda > 0.0)
+		fobjval += l1Regularizer(beta);
+	
+	return fobjval;
+}
+
+
 void LogisticRegression::stochasticGradient(int sampleID, 
 		Beta& beta, std::vector<double> &intercept,
 		Beta& betaGrad, std::vector<double> &interceptGrad)  
 {
-	/* compute stochastic gradient using sampleID w.r.t beta and intercept */
+	/* compute stochastic gradient of loss using sampleID w.r.t beta and intercept */
 	std::vector<double> classProb(numClass);	
 	this->multinomialProb(sampleID, classProb, beta, intercept);
 	for(int k=0; k<numClass-1; k++)
 	{
 		double lbl = (label[sampleID]==k ? 1.0 : 0.0);
 		double coeff =  classProb[k] - lbl;
-		interceptGrad[k] = coeff;
+		interceptGrad[k] += coeff;
 		for(int i=xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++) 
 			betaGrad.beta[k][xfeature.col[i]] += coeff * xfeature.val[i];
+	}
+}
+
+
+void LogisticRegression::subgradientL1Regularizer(Beta& beta, Beta& betaGrad)
+{
+	/* write the subgradient w.r.t L1 regularizer on betaGrad */
+	for(int k=0; k<this->numClass-1; k++)
+	{
+		for(int i=0; i<dimension; i++)
+		{
+			if(beta.beta[k][i]>0.0)
+			{
+				betaGrad.beta[k][i] += this->_l1Lambda;
+			} else if(beta.beta[k][i]<0.0)
+			{
+				betaGrad.beta[k][i] -= this->_l1Lambda;
+			}
+		}
+	}	
+}
+
+
+void LogisticRegression::proximalL1(Beta& beta)
+{
+	/* 
+	take beta as input of Proxy(beta) and modified beta 
+	with proximal operator 
+	*/
+	for(int k=0; k<numClass-1; k++)
+	{
+		for(int i=0; i<dimension; i++)
+		{
+			if(fabs(beta.beta[k][i])<=this->_l1Lambda)
+			{
+				beta.beta[k][i]=0.0;
+			} else {
+				double softthresholding = fabs(beta.beta[k][i])-this->_l1Lambda; 
+				beta.beta[k][i] = (beta.beta[k][i] > 0.0 ? 
+						softthresholding : -1*softthresholding);
+			}
+		}
 	}
 }
 
@@ -125,6 +213,10 @@ void LogisticRegression::stochasticGradient(int sampleID,
 void LogisticRegression::fit_by_SGD(double initStepSize, int batchSize, 
 		int maxIter, OptHistory &history, bool writeHistory)
 {
+	/* 
+		solve  min 1/n * sum L(x_i,y_i, beta, intercept) + l1lambda * R(beta) 
+	using Stochastic Proximal Gradient Descent 
+	*/	
 	// working variables
 	Beta betaTemp(this->_beta);
 	Beta betaGrad(numClass, dimension, true);
@@ -133,7 +225,7 @@ void LogisticRegression::fit_by_SGD(double initStepSize, int batchSize,
 	// opt initialization 
 	if (writeHistory)
 	{
-		history.nll[0] = this->negativeLogLik();
+		history.fobj[0] = this->objValue(betaTemp, interceptTemp);
 		for(int n=0; n<numSamples; n++)
 			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
 		history.gradNormSq[0] += betaGrad.l2normsq();
@@ -148,6 +240,7 @@ void LogisticRegression::fit_by_SGD(double initStepSize, int batchSize,
 	key[0] = CommonUtility::time_start_int;//seed		
 	for(int t=0; t<maxIter; t++)
 	{
+		std::cout << "***************** iteration " << t << "*****************\n";
 		std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
 		betaGrad.setzero();
 		// sample selection and batch gradient
@@ -155,7 +248,7 @@ void LogisticRegression::fit_by_SGD(double initStepSize, int batchSize,
 		{
 			ctr[0] = t;
 			ctr[1] = b;
-			//unif(-1,1)
+			// unif(-1,1)
         	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); 
 			double x = r123::uneg11<double>(unidrand[0]);
 			//discretized range
@@ -163,27 +256,134 @@ void LogisticRegression::fit_by_SGD(double initStepSize, int batchSize,
 			stochasticGradient(r, betaTemp, interceptTemp, betaGrad, interceptGrad);
 		}		
 		// averaging and increment
-		stepsize = initStepSize/(t+1);
+		// stepsize = initStepSize/(t+1);
 		for(int k=0; k<numClass-1; k++)
 		{
 			interceptGrad[k] *= (1.0/batchSize);
 			interceptTemp[k] -= stepsize * interceptGrad[k];
 		}
 		betaGrad *= (1.0/batchSize);
+		/* diagnostic */
+		double infnorm = 0.0;
+		for(int k=0; k<numClass-1; k++)
+		{
+			for(int i=0; i<dimension; i++)
+				infnorm = (fabs(betaGrad.beta[k][i]) > infnorm ? fabs(betaGrad.beta[k][i]) : infnorm);
+		}
+		std::cout << "||grad f||_inf: "<< infnorm << " |  eta: " << stepsize
+					<< " |  update UB: " << infnorm*stepsize 
+					<< " |  ||beta||^2_2: " << betaTemp.l2normsq();
+
 		betaTemp -= betaGrad * stepsize;
+
+		infnorm = 0.0;
+		for(int k=0; k<numClass-1; k++)
+		{
+			for(int i=0; i<dimension; i++)
+				infnorm = (fabs(betaTemp.beta[k][i]) > infnorm ? fabs(betaTemp.beta[k][i]) : infnorm);
+		}
+		std::cout << " |  ||beta_new||_inf: " << infnorm;
+		/********* proximal operator **********/
+		proximalL1(betaTemp);
+
+		infnorm = 0.0;
+		for(int k=0; k<numClass-1; k++)
+		{
+			for(int i=0; i<dimension; i++)
+				infnorm = (fabs(betaTemp.beta[k][i]) > infnorm ? fabs(betaTemp.beta[k][i]) : infnorm);
+		}
+		std::cout << " |  ||Proxy(beta_new)||_inf: " << infnorm << std::endl;
+
+
 		if (writeHistory)
 		{
-			history.nll[t+1] = this->negativeLogLik(betaTemp, interceptTemp);
+			history.fobj[t+1] = this->objValue(betaTemp, interceptTemp);
 			std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
 			betaGrad.setzero();			
 			for(int n=0; n<numSamples; n++)
 				stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
+			betaGrad *= 1/this->numSamples;
+			subgradientL1Regularizer(betaTemp, betaGrad);
 			history.gradNormSq[t+1] += betaGrad.l2normsq();
 			for(int k=0; k<numClass-1; k++)
 				history.gradNormSq[t+1] += interceptGrad[k]*interceptGrad[k];
 		}
-	}	
+	}
+
 	this->_beta = betaTemp;
 	this->_intercept = interceptTemp;
 
 } //end of fit_by_SGD
+
+
+void LogisticRegression::fit_by_AGD(double initStepSize,
+		int maxIter, OptHistory &history, bool writeHistory)
+{
+	/* 
+		solve  min 1/n * sum L(x_i,y_i, beta, intercept) + l1lambda * R(beta) 
+	using Accelerated Proximal Gradient Descent 
+	*/
+	// working variables
+	Beta betaTemp(this->_beta);
+	Beta betaGrad(numClass, dimension, true);
+	std::vector<double> interceptTemp(this->_intercept);
+	std::vector<double> interceptGrad(numClass-1,0.0);
+	// opt initialization 
+	if (writeHistory)
+	{
+		history.fobj[0] = this->objValue(betaTemp, interceptTemp);
+		for(int n=0; n<numSamples; n++)
+			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
+		history.gradNormSq[0] += betaGrad.l2normsq();
+		for(int k=0; k<numClass-1; k++)
+			history.gradNormSq[0] += interceptGrad[k]*interceptGrad[k];
+	}	
+	double stepsize = initStepSize;	
+	// random generator
+	CommonUtility::CBRNG g;
+	CommonUtility::CBRNG::ctr_type ctr = {{}};
+    CommonUtility::CBRNG::key_type key = {{}};	
+	key[0] = CommonUtility::time_start_int;//seed		
+	for(int t=0; t<maxIter; t++)
+	{
+		std::cout << "iteration " << t << std::endl;
+		std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
+		betaGrad.setzero();
+		// sample selection and batch gradient
+		for(int n=0; n<numSamples; n++)
+			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
+		
+		// stepsize = initStepSize/(t+1);
+		for(int k=0; k<numClass-1; k++)
+		{
+			interceptGrad[k] *= (1.0/numSamples);
+			interceptTemp[k] -= stepsize * interceptGrad[k];
+		}
+		betaGrad *= (1.0/numSamples);
+		betaTemp -= betaGrad * stepsize;
+		proximalL1(betaTemp);
+
+		if (writeHistory)
+		{
+			history.fobj[t+1] = this->objValue(betaTemp, interceptTemp);
+			std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
+			betaGrad.setzero();			
+			for(int n=0; n<numSamples; n++)
+				stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
+			betaGrad *= 1/this->numSamples;
+			subgradientL1Regularizer(betaTemp, betaGrad);
+			history.gradNormSq[t+1] += betaGrad.l2normsq();
+			for(int k=0; k<numClass-1; k++)
+				history.gradNormSq[t+1] += interceptGrad[k]*interceptGrad[k];
+		}
+		if (history.gradNormSq[t+1] <= pow(10,-5))
+		{
+			std::cout << "first order optimality reached; stop opt process\n";
+			break;
+		}
+	}
+
+	this->_beta = betaTemp;
+	this->_intercept = interceptTemp;
+
+} //end of fit_by_AGD

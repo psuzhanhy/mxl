@@ -45,9 +45,9 @@ int main(int argc, char **argv)
 
 	std::ofstream ofs;
 	ofs.open(outfilestr,std::ofstream::out | std::ofstream::app);
-	for(int t=0; t<optHistory.nll.size(); t++)
+	for(int t=0; t<optHistory.fobj.size(); t++)
 	{
-		ofs << optHistory.nll[t] << "," << optHistory.gradNormSq[t] << ","
+		ofs << optHistory.fobj[t] << "," << optHistory.gradNormSq[t] << ","
 			<< optHistory.paramChange[t] << "," << optHistory.iterTime[t] << std::endl;
 
 	}

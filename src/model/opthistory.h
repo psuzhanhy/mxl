@@ -8,11 +8,11 @@
 struct OptHistory
 {
 	int maxIter;
-	std::vector<double> nll;
+	std::vector<double> fobj;
 	std::vector<double> gradNormSq;
 	std::vector<double> iterTime;
 	std::vector<double> paramChange;
-	OptHistory(int iter): maxIter(iter), nll(iter+1,0.0), 
+	OptHistory(int iter): maxIter(iter), fobj(iter+1,0.0), 
 			gradNormSq(iter+1,0.0), iterTime(iter+1,0.0),
 			paramChange(iter+1,0.0) {}	
 };
