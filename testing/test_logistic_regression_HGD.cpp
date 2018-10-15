@@ -16,7 +16,7 @@
 int main(int argc, char **argv) 
 {
 
-	std::cout << "tester for LogisticRegression fit with Full Gradient Descent \n";
+	std::cout << "tester for LogisticRegression fit with Hybrid Proximal Gradient \n";
 	char *input_filename;
     DenseData data;
     int numclass=4;
@@ -32,19 +32,19 @@ int main(int argc, char **argv)
 	double stepsize = 0.1;
 	int maxIter = 10000;
    
-	OptHistory optHistory(maxIter); 
+	OptHistory sgdHistory(maxIter); 
 	bool writeHistory = true;
-	lr.proximalGD(stepsize, maxIter, optHistory, writeHistory);	
+	lr.proximalHybridGD(stepsize, maxIter, sgdHistory, writeHistory);	
     
 	char outfilestr[200];
-    sprintf (outfilestr, "testlr_fitAGD.txt");
+    sprintf (outfilestr, "testlr_HybridGD.txt");
 
 	std::ofstream ofs;
 	ofs.open(outfilestr,std::ofstream::out | std::ofstream::app);
-	for(int t=0; t<optHistory.fobj.size(); t++)
+	for(int t=0; t<sgdHistory.fobj.size(); t++)
 	{
-		ofs << optHistory.fobj[t] << "," << optHistory.gradNormSq[t] << ","
-			<< optHistory.paramChange[t] << "," << optHistory.iterTime[t] << std::endl;
+		ofs << sgdHistory.fobj[t] << "," << sgdHistory.gradNormSq[t] << ","
+			<< sgdHistory.paramChange[t] << "," << sgdHistory.iterTime[t] << std::endl;
 
 	}
 	ofs.close();

@@ -1,13 +1,16 @@
 CXX = g++
 CXXFLAGS = -std=c++11 -fopenmp -O3 -flto -I src/utility/ -I src/model/ -I src/opt/ -I src/param/ -I Random123/include/ -I Random123/examples/
 
-all: testlr_SGD testlr_AGD testmxl 
+all: testlr_SGD testlr_HGD testlr_AGD testmxl 
 
 testlr_SGD: testing/test_logistic_regression_SGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
-	$(CXX) $(CXXFLAGS) -o testLRSGD testing/test_logistic_regression_SGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
+	$(CXX) $(CXXFLAGS) -o testLR_StochasticGD testing/test_logistic_regression_SGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
+
+testlr_HGD: testing/test_logistic_regression_HGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
+	$(CXX) $(CXXFLAGS) -o testLR_HybridGD testing/test_logistic_regression_HGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
 
 testlr_AGD: testing/test_logistic_regression_AGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
-	$(CXX) $(CXXFLAGS) -o testLRAGD testing/test_logistic_regression_AGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
+	$(CXX) $(CXXFLAGS) -o testLR_FullGD testing/test_logistic_regression_AGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
 
 testmxl: testing/test_mxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o
 	$(CXX) $(CXXFLAGS) -o testmxl testing/test_mxl.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o

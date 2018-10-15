@@ -16,7 +16,7 @@
 int main(int argc, char **argv) 
 {
 
-	std::cout << "tester for LogisticRegression class \n";
+	std::cout << "tester for LogisticRegression fit with Stochastic Gradient \n";
 	char *input_filename;
     DenseData data;
     int numclass=4;
@@ -35,7 +35,7 @@ int main(int argc, char **argv)
    
 	OptHistory sgdHistory(maxIter); 
 	bool writeHistory = true;
-	lr.fit_by_SGD(stepsize, batchSize, maxIter, sgdHistory, writeHistory);	
+	lr.proximalSGD(stepsize, batchSize, maxIter, sgdHistory, writeHistory);	
     
 	char outfilestr[200];
     sprintf (outfilestr, "testlr_SGD.txt");
