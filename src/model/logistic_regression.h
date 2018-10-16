@@ -32,7 +32,7 @@ class LogisticRegression : public Logistic
  	    void proximalSGD(double initStepSize, int batchSize, int maxIter, 
                 OptHistory &history, bool writeHistory);  
 
-        void proximalGD(double initStepSize, int maxIter, 
+        void proximalGD(double stepSize, int maxIter, 
                 OptHistory &history, bool writeHistory);
 
         void proximalHybridGD(double stepSize, int maxIter, 
@@ -48,7 +48,7 @@ class LogisticRegression : public Logistic
 
         void proximalL1(Beta& beta);
 
-        void subgradientL1Regularizer(Beta& beta, Beta& betaGrad);
+        void l1Regularizer_Subgradient(Beta& beta, Beta& betaGrad);
 
         void setL1Lambda(double l1Lambda);
 

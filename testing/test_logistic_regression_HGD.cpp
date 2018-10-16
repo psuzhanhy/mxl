@@ -24,10 +24,10 @@ int main(int argc, char **argv)
     ReadDenseInput(input_filename, &data);   
 	CSR_matrix xf = Dense2CSR(data);
 	int p=xf.number_cols;
-	double l1Lambda = 0.001;
+	double l1Lambda = 0.0;
 
 	LogisticRegression lr = LogisticRegression(xf, data.label, 
-            numclass, p, l1Lambda, false);
+            numclass, p, l1Lambda, true);
 
 	double stepsize = 0.1;
 	int maxIter = 10000;
@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 	for(int t=0; t<sgdHistory.fobj.size(); t++)
 	{
 		ofs << sgdHistory.fobj[t] << "," << sgdHistory.gradNormSq[t] << ","
-			<< sgdHistory.paramChange[t] << "," << sgdHistory.iterTime[t] << std::endl;
+			<< sgdHistory.iterTime[t] << std::endl;
 
 	}
 	ofs.close();

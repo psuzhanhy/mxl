@@ -168,7 +168,7 @@ void LogisticRegression::stochasticGradient(int sampleID,
 }
 
 
-void LogisticRegression::subgradientL1Regularizer(Beta& beta, Beta& betaGrad)
+void LogisticRegression::l1Regularizer_Subgradient(Beta& beta, Beta& betaGrad)
 {
 	/* write the subgradient w.r.t L1 regularizer on betaGrad */
 	for(int k=0; k<this->numClass-1; k++)
@@ -225,22 +225,28 @@ void LogisticRegression::proximalSGD(double initStepSize, int batchSize,
 	// opt initialization 
 	if (writeHistory)
 	{
-		history.fobj[0] = this->objValue(betaTemp, interceptTemp);
+		history.iterTime.push_back(0.0);
+		history.fobj.push_back(this->objValue(betaTemp, interceptTemp));
 		for(int n=0; n<numSamples; n++)
 			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
-		history.gradNormSq[0] += betaGrad.l2normsq();
+		history.gradNormSq.push_back(betaGrad.l2normsq());
 		for(int k=0; k<numClass-1; k++)
-			history.gradNormSq[0] += interceptGrad[k]*interceptGrad[k];
+			history.gradNormSq.back() += interceptGrad[k]*interceptGrad[k];
 	}	
 	double stepsize = initStepSize;	
 	// random generator
 	CommonUtility::CBRNG g;
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
     CommonUtility::CBRNG::key_type key = {{}};	
-	key[0] = CommonUtility::time_start_int;//seed		
+	key[0] = CommonUtility::time_start_int;//seed	
+	int countDataPass = 0;
+	int effectivePass = 0;
+	struct timeval start, finish;
+	// timer
+	gettimeofday(&start,nullptr) ; // set timer start 
 	for(int t=0; t<maxIter; t++)
 	{
-		std::cout << "***************** iteration " << t << " *****************\n";
+		//std::cout << "***************** iteration " << t << " *****************\n";
 		std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
 		betaGrad.setzero();
 		// sample selection and batch gradient
@@ -255,6 +261,7 @@ void LogisticRegression::proximalSGD(double initStepSize, int batchSize,
 			int r = 0.5 * (x + 1.0) * (this->numSamples-1);
 			stochasticGradient(r, betaTemp, interceptTemp, betaGrad, interceptGrad);
 		}		
+		countDataPass += batchSize;
 		// averaging and increment
 		stepsize = initStepSize/(t+1);
 		for(int k=0; k<numClass-1; k++)
@@ -266,25 +273,35 @@ void LogisticRegression::proximalSGD(double initStepSize, int batchSize,
 		betaTemp -= betaGrad * stepsize;
 		// proximal operator 
 		proximalL1(betaTemp);
-
-		if (writeHistory)
+		
+		if (writeHistory & countDataPass/this->numSamples>effectivePass)
 		{
-			history.fobj[t+1] = this->objValue(betaTemp, interceptTemp);
+			effectivePass++;
+			// timer
+			gettimeofday(&finish,nullptr) ; // set timer start 
+			history.iterTime.push_back(history.iterTime.back()+finish.tv_sec-start.tv_sec);     
+			history.iterTime.back() += (finish.tv_usec-start.tv_usec)/(1000.0 * 1000.0); 
+			// obj value
+			history.fobj.push_back(this->objValue(betaTemp, interceptTemp));
+			// first order optimality
 			std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
 			betaGrad.setzero();			
 			for(int n=0; n<numSamples; n++)
 				stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
 			betaGrad *= 1/this->numSamples;
-			subgradientL1Regularizer(betaTemp, betaGrad);
-			history.gradNormSq[t+1] += betaGrad.l2normsq();
+			l1Regularizer_Subgradient(betaTemp, betaGrad);
+			history.gradNormSq.push_back(betaGrad.l2normsq());
 			for(int k=0; k<numClass-1; k++)
-				history.gradNormSq[t+1] += interceptGrad[k]*interceptGrad[k];
+				history.gradNormSq.back()  += interceptGrad[k]*interceptGrad[k];
+			// reset timer
+			gettimeofday(&start,nullptr) ; // set timer start 
 		}
-		if (history.gradNormSq[t+1] <= pow(10,-5))
+	
+		if (history.gradNormSq.back() <= pow(10,-5))
 		{
 			std::cout << "first order optimality reached; stop opt process\n";
 			break;
-		}		
+		}	
 	}
 
 	this->_beta = betaTemp;
@@ -308,24 +325,30 @@ void LogisticRegression::proximalHybridGD(double stepSize,
 	// opt initialization 
 	if (writeHistory)
 	{
-		history.fobj[0] = this->objValue(betaTemp, interceptTemp);
+		history.iterTime.push_back(0.0);
+		history.fobj.push_back(this->objValue(betaTemp, interceptTemp));
 		for(int n=0; n<numSamples; n++)
 			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
-		history.gradNormSq[0] += betaGrad.l2normsq();
+		history.gradNormSq.push_back(betaGrad.l2normsq());
 		for(int k=0; k<numClass-1; k++)
-			history.gradNormSq[0] += interceptGrad[k]*interceptGrad[k];
+			history.gradNormSq.back() += interceptGrad[k]*interceptGrad[k];
 	}	
 
 	int batchSize = 1;	
 	int batchStart = 0;
+	int countDataPass = 0;
+	int effectivePass = 0;
+	struct timeval start, finish;
+	gettimeofday(&start,nullptr) ; // set timer start 
 	for(int t=0; t<maxIter; t++)
 	{
-		std::cout << "***************** iteration " << t << " *****************\n";
-		std::cout << "batch size: " << batchSize << std::endl;
+		//std::cout << "***************** iteration " << t << " *****************\n";
+		//std::cout << "batch size: " << batchSize << std::endl;
 		std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
 		betaGrad.setzero();
 		// sample selection and batch gradient
 		batchSize = (this->numSamples < 1.1*batchSize+1 ? this->numSamples : 1.1*batchSize+1);
+		countDataPass += batchSize;
 		if (batchSize < this->numSamples)
 		{
 			if(batchStart+batchSize-1 < this->numSamples)
@@ -361,20 +384,30 @@ void LogisticRegression::proximalHybridGD(double stepSize,
 		// proximal operator 
 		proximalL1(betaTemp);
 
-		if (writeHistory)
+		if (writeHistory & countDataPass/this->numSamples>effectivePass)
 		{
-			history.fobj[t+1] = this->objValue(betaTemp, interceptTemp);
+			effectivePass++;
+			// timer
+			gettimeofday(&finish,nullptr) ; // set timer start 
+			history.iterTime.push_back(history.iterTime.back()+finish.tv_sec-start.tv_sec);     
+			history.iterTime.back() += (finish.tv_usec-start.tv_usec)/(1000.0 * 1000.0); 
+			// obj value
+			history.fobj.push_back(this->objValue(betaTemp, interceptTemp));
+			// first order optimality
 			std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
 			betaGrad.setzero();			
 			for(int n=0; n<numSamples; n++)
 				stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
 			betaGrad *= 1/this->numSamples;
-			subgradientL1Regularizer(betaTemp, betaGrad);
-			history.gradNormSq[t+1] += betaGrad.l2normsq();
+			l1Regularizer_Subgradient(betaTemp, betaGrad);
+			history.gradNormSq.push_back(betaGrad.l2normsq());
 			for(int k=0; k<numClass-1; k++)
-				history.gradNormSq[t+1] += interceptGrad[k]*interceptGrad[k];
+				history.gradNormSq.back()  += interceptGrad[k]*interceptGrad[k];
+			// reset timer
+			gettimeofday(&start,nullptr) ; // set timer start 
 		}
-		if (history.gradNormSq[t+1] <= pow(10,-5))
+
+		if (history.gradNormSq.back() <= pow(10,-5))
 		{
 			std::cout << "first order optimality reached; stop opt process\n";
 			break;
@@ -387,7 +420,7 @@ void LogisticRegression::proximalHybridGD(double stepSize,
 } //end of proximalHybridGD
 
 
-void LogisticRegression::proximalGD(double initStepSize,
+void LogisticRegression::proximalGD(double stepSize,
 		int maxIter, OptHistory &history, bool writeHistory)
 {
 	/* 
@@ -402,46 +435,61 @@ void LogisticRegression::proximalGD(double initStepSize,
 	// opt initialization 
 	if (writeHistory)
 	{
-		history.fobj[0] = this->objValue(betaTemp, interceptTemp);
+		history.iterTime.push_back(0.0);
+		history.fobj.push_back(this->objValue(betaTemp, interceptTemp));
 		for(int n=0; n<numSamples; n++)
 			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
-		history.gradNormSq[0] += betaGrad.l2normsq();
+		history.gradNormSq.push_back(betaGrad.l2normsq());
 		for(int k=0; k<numClass-1; k++)
-			history.gradNormSq[0] += interceptGrad[k]*interceptGrad[k];
+			history.gradNormSq.back() += interceptGrad[k]*interceptGrad[k];
 	}	
-	double stepsize = initStepSize;		
+
+	int countDataPass = 0;
+	struct timeval start, finish;	
+	gettimeofday(&start,nullptr) ; // set timer start 
+
 	for(int t=0; t<maxIter; t++)
 	{
-		std::cout << "***************** iteration " << t << " *****************\n";
+		//std::cout << "***************** iteration " << t << " *****************\n";
 		std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
 		betaGrad.setzero();
 		// sample selection and batch gradient
 		for(int n=0; n<numSamples; n++)
 			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
-		
+		countDataPass += numSamples;
+
 		for(int k=0; k<numClass-1; k++)
 		{
 			interceptGrad[k] *= (1.0/numSamples);
-			interceptTemp[k] -= stepsize * interceptGrad[k];
+			interceptTemp[k] -= stepSize * interceptGrad[k];
 		}
 		betaGrad *= (1.0/numSamples);
-		betaTemp -= betaGrad * stepsize;
+		betaTemp -= betaGrad * stepSize;
 		proximalL1(betaTemp);
 
-		if (writeHistory)
+		if (writeHistory & countDataPass%this->numSamples==0)
 		{
-			history.fobj[t+1] = this->objValue(betaTemp, interceptTemp);
+			// timer
+			gettimeofday(&finish,nullptr) ; // set timer start 
+			history.iterTime.push_back(history.iterTime.back()+finish.tv_sec-start.tv_sec);     
+			history.iterTime.back() += (finish.tv_usec-start.tv_usec)/(1000.0 * 1000.0); 
+			// obj value
+			history.fobj.push_back(this->objValue(betaTemp, interceptTemp));
+			// first order optimality
 			std::fill(interceptGrad.begin(), interceptGrad.end(), 0.0);
 			betaGrad.setzero();			
 			for(int n=0; n<numSamples; n++)
 				stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
 			betaGrad *= 1/this->numSamples;
-			subgradientL1Regularizer(betaTemp, betaGrad);
-			history.gradNormSq[t+1] += betaGrad.l2normsq();
+			l1Regularizer_Subgradient(betaTemp, betaGrad);
+			history.gradNormSq.push_back(betaGrad.l2normsq());
 			for(int k=0; k<numClass-1; k++)
-				history.gradNormSq[t+1] += interceptGrad[k]*interceptGrad[k];
+				history.gradNormSq.back()  += interceptGrad[k]*interceptGrad[k];
+			// reset timer
+			gettimeofday(&start,nullptr) ; // set timer start 
 		}
-		if (history.gradNormSq[t+1] <= pow(10,-5))
+
+		if (history.gradNormSq.back() <= pow(10,-5))
 		{
 			std::cout << "first order optimality reached; stop opt process\n";
 			break;
