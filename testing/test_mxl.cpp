@@ -35,7 +35,7 @@ int main(int argc, char **argv)
    
 	OptHistory sgdHistory(maxEpochs), apgHistory(maxEpochs); 
 	//gmxl1.fit_by_SGD(stepsize_SGD,scalar,maxEpochs, sgdHistory);
-	gmxl1.fit_by_APG(stepsize_APG, momentum, shrinkage, maxEpochs, apgHistory);	
+	gmxl1.fit_by_APG(stepsize_APG, momentum, shrinkage, maxEpochs, apgHistory, true);	
 	
 	OptHistory optHistory(apgHistory);
    
@@ -53,31 +53,5 @@ int main(int argc, char **argv)
 	}
 	ofs.close();
 
-	auto fitlabel = gmxl1.insamplePrediction();
-	double correctfit = 0.0;
-
-	std::vector<int> count(numclass,0.0);
-	for(int n=0; n<data.label.size(); n++)
-		count[data.label[n]]++;
-	
-	for(int n=0; n<fitlabel.size(); n++)
-	{
-		try
-		{
-			if (fitlabel[n] == -1)	
-				throw "-1";
-		} catch(const char* msg)
-		{
-			std::cout << msg << std::endl;
-		}
-		
-		//std::cout << n << " " <<  fitlabel[n] << " " << data.label[n] << std::endl;
-		if (data.label[n] == 0 && fitlabel[n] == data.label[n])
-			correctfit += 1.0;
-	}
-	double accuracy = correctfit/count[0];
-	std::cout << accuracy << std::endl;
-	std::cout << static_cast<double>(count[0])/data.label.size() << std::endl;
-		
 	return 0;
 }

@@ -38,6 +38,16 @@ class MxlGaussianBlockDiag : public Logistic
 					covCholeskey, CommonUtility::numSecondaryThreads);
 		}
 
+		double objValue(const std::vector<double> &classConstants,
+				const ClassMeans &means,
+				const BlockCholeskey &covCholeskey, int numThreads);
+
+		double objValue()
+		{
+			return objValue(classConstants, means, 
+					covCholeskey, CommonUtility::numSecondaryThreads);		
+		}
+		
 		void propensityFunction(const std::vector<double> &classConstants,
 	    		const ClassMeans &means, const BlockCholeskey &covCholeskey,
 	 			int sampleID, const std::vector<double> &normalDraws,
@@ -54,18 +64,15 @@ class MxlGaussianBlockDiag : public Logistic
 				const std::vector<double> &normalrv, 
 				std::vector<double> &simProb);
 
-		void simulatedProbability_inline(int sampleID, 
-				std::vector<double> &simProb);
-
 		void gradient(int sampleID, std::vector<double> &constantGrad,
 				ClassMeans &meanGrad, BlockCholeskey &covGrad);
 
-		void fit_by_SGD(double stepsize, double scalar, 
-				int maxEpochs, OptHistory &history);
+		void fit_by_SGD(double stepsize, int maxEpochs, 
+				OptHistory &history, bool writeHistory);
 
 		void fit_by_APG(double stepsize, double momentum, 
 				double momentumShrinkage, int maxIter,
-				OptHistory &history);
+				OptHistory &history, bool writeHistory);
 
 		double l2normsq(const ClassMeans &mean1,
 				const BlockCholeskey &cov1,
@@ -90,11 +97,6 @@ class MxlGaussianBlockDiag : public Logistic
 				const BlockCholeskey &cov1);
 		
 		std::vector<int> insamplePrediction();
-
-		double testRay(const std::vector<double> &classConstants,
-					const ClassMeans &means,
-					const BlockCholeskey &covCholeskey, 
-					int scarlar,int numThreads); 
 
 		BlockCholeskey getCovCholeskey() {return this->covCholeskey;}
 

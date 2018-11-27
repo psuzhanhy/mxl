@@ -25,13 +25,14 @@ int main(int argc, char **argv)
 	CSR_matrix xf = Dense2CSR(data);
 	int p=xf.number_cols;
 	double l1Lambda = 0.0;
+	double l2Lambda = 0.1;
 
 	LogisticRegression lr = LogisticRegression(xf, data.label, 
-            numclass, p, l1Lambda, true);
+            numclass, p, l1Lambda, l2Lambda, true);
 
-	double stepsize = 1;
-    int batchSize = 180 ;
-	int maxIter = 1000000;
+	double stepsize = 0.1;
+    int batchSize = 1;
+	int maxIter = 10000000;
    
 	OptHistory sgdHistory(maxIter); 
 	bool writeHistory = true;

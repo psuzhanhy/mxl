@@ -17,10 +17,11 @@ class LogisticRegression : public Logistic
         Beta _beta;
         std::vector<double> _intercept;
         double _l1Lambda;
+        double _l2Lambda;
 
     public:
         LogisticRegression(CSR_matrix xf, std::vector<int> lbl, 
-            int numclass, int dim, double l1Lambda, bool zeroinit);
+            int numclass, int dim, double l1Lambda, double l2Lambda, bool zeroinit);
 
         void multinomialProb(int sampleID, std::vector<double> &classProb, 
             Beta &beta, std::vector<double>& intercept);
@@ -46,9 +47,13 @@ class LogisticRegression : public Logistic
 
         double l1Regularizer(Beta& beta) const;
 
+        double l2Regularizer(Beta& beta) const;
+
         void proximalL1(Beta& beta);
 
-        void l1Regularizer_Subgradient(Beta& beta, Beta& betaGrad);
+        void l1Regularizer_Subgradient(Beta& beta, Beta& betaGrad) const;
+
+        void l2Regularizer_Gradient(Beta& beta, Beta& betaGrad) const;
 
         void setL1Lambda(double l1Lambda);
 

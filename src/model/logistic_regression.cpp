@@ -18,11 +18,11 @@
 #include <math.h>
 
 LogisticRegression::LogisticRegression(CSR_matrix xf, std::vector<int> lbl, 
-        int numclass, int dim, double l1Lambda, bool zeroinit): 
+        int numclass, int dim, double l1Lambda, double l2Lambda, bool zeroinit): 
         Logistic(xf,lbl,numclass,dim),
         _beta(numclass, dim, zeroinit),
 		_intercept(numClass-1, 0.0),
-		_l1Lambda(l1Lambda)
+		_l1Lambda(l1Lambda), _l2Lambda(l2Lambda)
 {
 	/*	
 	*	ctor for LogisticRegression class
@@ -137,6 +137,18 @@ double LogisticRegression::l1Regularizer(Beta& beta) const
 }
 
 
+double LogisticRegression::l2Regularizer(Beta& beta) const
+{
+	double penaltyval = 0.0;
+	for(int k=0; k<this->numClass-1; k++)
+	{
+		for(int i=0; i<dimension; i++)
+			penaltyval += this->_l2Lambda * beta.beta[k][i] * beta.beta[k][i];
+	}
+	return penaltyval;
+}
+
+
 double LogisticRegression::objValue(Beta& beta, std::vector<double> &intercept)
 {
 	/* 
@@ -145,7 +157,10 @@ double LogisticRegression::objValue(Beta& beta, std::vector<double> &intercept)
 	double fobjval = negativeLogLik(beta, intercept)/this->numSamples;
 	if(this->_l1Lambda > 0.0)
 		fobjval += l1Regularizer(beta);
-	
+
+	if(this->_l2Lambda > 0.0)
+		fobjval += l2Regularizer(beta);
+
 	return fobjval;
 }
 
@@ -168,7 +183,7 @@ void LogisticRegression::stochasticGradient(int sampleID,
 }
 
 
-void LogisticRegression::l1Regularizer_Subgradient(Beta& beta, Beta& betaGrad)
+void LogisticRegression::l1Regularizer_Subgradient(Beta& beta, Beta& betaGrad) const
 {
 	/* write the subgradient w.r.t L1 regularizer on betaGrad */
 	for(int k=0; k<this->numClass-1; k++)
@@ -183,6 +198,17 @@ void LogisticRegression::l1Regularizer_Subgradient(Beta& beta, Beta& betaGrad)
 				betaGrad.beta[k][i] -= this->_l1Lambda;
 			}
 		}
+	}	
+}
+
+
+void LogisticRegression::l2Regularizer_Gradient(Beta& beta, Beta& betaGrad) const
+{
+	/* write the subgradient w.r.t L1 regularizer on betaGrad */
+	for(int k=0; k<this->numClass-1; k++)
+	{
+		for(int i=0; i<dimension; i++)
+			betaGrad.beta[k][i] += 2 * this->_l2Lambda * beta.beta[k][i];
 	}	
 }
 
@@ -229,9 +255,15 @@ void LogisticRegression::proximalSGD(double initStepSize, int batchSize,
 		history.fobj.push_back(this->objValue(betaTemp, interceptTemp));
 		for(int n=0; n<numSamples; n++)
 			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
+		betaGrad *= 1/this->numSamples;
+		l2Regularizer_Gradient(betaTemp, betaGrad); // L2
+		l1Regularizer_Subgradient(betaTemp, betaGrad); // L1
 		history.gradNormSq.push_back(betaGrad.l2normsq());
 		for(int k=0; k<numClass-1; k++)
-			history.gradNormSq.back() += interceptGrad[k]*interceptGrad[k];
+		{
+			interceptGrad[k] /= this->numSamples;
+			history.gradNormSq.back()  += interceptGrad[k]*interceptGrad[k];
+		}
 	}	
 	double stepsize = initStepSize;	
 	// random generator
@@ -263,13 +295,14 @@ void LogisticRegression::proximalSGD(double initStepSize, int batchSize,
 		}		
 		countDataPass += batchSize;
 		// averaging and increment
-		stepsize = initStepSize/(t+1);
+		// stepsize = initStepSize/(t+1);
 		for(int k=0; k<numClass-1; k++)
 		{
 			interceptGrad[k] *= (1.0/batchSize);
 			interceptTemp[k] -= stepsize * interceptGrad[k];
 		}
 		betaGrad *= (1.0/batchSize);
+		l2Regularizer_Gradient(betaTemp, betaGrad); //add gradient wrt L2 term
 		betaTemp -= betaGrad * stepsize;
 		// proximal operator 
 		proximalL1(betaTemp);
@@ -289,10 +322,15 @@ void LogisticRegression::proximalSGD(double initStepSize, int batchSize,
 			for(int n=0; n<numSamples; n++)
 				stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
 			betaGrad *= 1/this->numSamples;
-			l1Regularizer_Subgradient(betaTemp, betaGrad);
+
+			l2Regularizer_Gradient(betaTemp, betaGrad); // L2 
+			l1Regularizer_Subgradient(betaTemp, betaGrad);// L1
 			history.gradNormSq.push_back(betaGrad.l2normsq());
 			for(int k=0; k<numClass-1; k++)
+			{
+				interceptGrad[k] /= this->numSamples;
 				history.gradNormSq.back()  += interceptGrad[k]*interceptGrad[k];
+			}
 			// reset timer
 			gettimeofday(&start,nullptr) ; // set timer start 
 		}
@@ -329,9 +367,16 @@ void LogisticRegression::proximalHybridGD(double stepSize,
 		history.fobj.push_back(this->objValue(betaTemp, interceptTemp));
 		for(int n=0; n<numSamples; n++)
 			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
+		
+		betaGrad *= 1/this->numSamples;
+		l2Regularizer_Gradient(betaTemp, betaGrad); // L2
+		l1Regularizer_Subgradient(betaTemp, betaGrad); // L1
 		history.gradNormSq.push_back(betaGrad.l2normsq());
 		for(int k=0; k<numClass-1; k++)
-			history.gradNormSq.back() += interceptGrad[k]*interceptGrad[k];
+		{
+			interceptGrad[k] /= this->numSamples;
+			history.gradNormSq.back()  += interceptGrad[k]*interceptGrad[k];
+		}
 	}	
 
 	int batchSize = 1;	
@@ -379,6 +424,7 @@ void LogisticRegression::proximalHybridGD(double stepSize,
 			interceptTemp[k] -= stepSize * interceptGrad[k];
 		}
 		betaGrad *= (1.0/batchSize);
+		l2Regularizer_Gradient(betaTemp, betaGrad); //add gradient wrt L2 term
 		betaTemp -= betaGrad * stepSize;
 
 		// proximal operator 
@@ -399,10 +445,14 @@ void LogisticRegression::proximalHybridGD(double stepSize,
 			for(int n=0; n<numSamples; n++)
 				stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
 			betaGrad *= 1/this->numSamples;
-			l1Regularizer_Subgradient(betaTemp, betaGrad);
+			l2Regularizer_Gradient(betaTemp, betaGrad); // L2
+			l1Regularizer_Subgradient(betaTemp, betaGrad); // L1
 			history.gradNormSq.push_back(betaGrad.l2normsq());
 			for(int k=0; k<numClass-1; k++)
+			{
+				interceptGrad[k] /= this->numSamples;
 				history.gradNormSq.back()  += interceptGrad[k]*interceptGrad[k];
+			}
 			// reset timer
 			gettimeofday(&start,nullptr) ; // set timer start 
 		}
@@ -439,9 +489,15 @@ void LogisticRegression::proximalGD(double stepSize,
 		history.fobj.push_back(this->objValue(betaTemp, interceptTemp));
 		for(int n=0; n<numSamples; n++)
 			stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
+		betaGrad *= 1/this->numSamples;
+		l2Regularizer_Gradient(betaTemp, betaGrad); // L2
+		l1Regularizer_Subgradient(betaTemp, betaGrad); // L1
 		history.gradNormSq.push_back(betaGrad.l2normsq());
 		for(int k=0; k<numClass-1; k++)
-			history.gradNormSq.back() += interceptGrad[k]*interceptGrad[k];
+		{
+			interceptGrad[k] /= this->numSamples;
+			history.gradNormSq.back()  += interceptGrad[k]*interceptGrad[k];
+		}
 	}	
 
 	int countDataPass = 0;
@@ -464,6 +520,7 @@ void LogisticRegression::proximalGD(double stepSize,
 			interceptTemp[k] -= stepSize * interceptGrad[k];
 		}
 		betaGrad *= (1.0/numSamples);
+		l2Regularizer_Gradient(betaTemp, betaGrad); //add gradient wrt L2 term
 		betaTemp -= betaGrad * stepSize;
 		proximalL1(betaTemp);
 
@@ -481,10 +538,14 @@ void LogisticRegression::proximalGD(double stepSize,
 			for(int n=0; n<numSamples; n++)
 				stochasticGradient(n, betaTemp, interceptTemp, betaGrad, interceptGrad);
 			betaGrad *= 1/this->numSamples;
-			l1Regularizer_Subgradient(betaTemp, betaGrad);
+		    l2Regularizer_Gradient(betaTemp, betaGrad); // L2
+			l1Regularizer_Subgradient(betaTemp, betaGrad); // L1
 			history.gradNormSq.push_back(betaGrad.l2normsq());
 			for(int k=0; k<numClass-1; k++)
+			{
+				interceptGrad[k] /= this->numSamples;
 				history.gradNormSq.back()  += interceptGrad[k]*interceptGrad[k];
+			}
 			// reset timer
 			gettimeofday(&start,nullptr) ; // set timer start 
 		}
