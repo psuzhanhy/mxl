@@ -68,12 +68,16 @@ class MxlGaussianBlockDiag : public Logistic
 				ClassMeans &meanGrad, BlockCholeskey &covGrad);
 
 		void fit_by_SGD(double stepsize, int maxEpochs, 
-				OptHistory &history, bool writeHistory);
+				OptHistory &history, bool writeHistory, bool adaptiveStop);
 
 		void fit_by_APG(double stepsize, double momentum, 
 				double momentumShrinkage, int maxIter,
 				OptHistory &history, bool writeHistory);
 
+		void fit_by_Hybrid(double stepsizeSGD, double stepsizeAGD, 
+				double momentum, double momentumShrinkage,
+				int maxEpochs, OptHistory &history, bool writeHistory);
+				
 		double l2normsq(const ClassMeans &mean1,
 				const BlockCholeskey &cov1,
 				const std::vector<double> &constants1, 
@@ -99,6 +103,10 @@ class MxlGaussianBlockDiag : public Logistic
 		std::vector<int> insamplePrediction();
 
 		BlockCholeskey getCovCholeskey() {return this->covCholeskey;}
+
+		ClassMeans getMeans() {return this->means;}
+
+		std::vector<double> getConstants() {return this->classConstants;}
 
 };
 

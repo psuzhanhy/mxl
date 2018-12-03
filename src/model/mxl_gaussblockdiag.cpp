@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <iomanip>
 #include <math.h>
 #include <vector>
 #include <sys/time.h>
@@ -289,16 +290,16 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 		}
 		
 		for(int i=0; i<this->dimension; i++)
-			summationDraws[k*this->dimension+i] /= (probSAA * this->R * this->numSamples);
+			summationDraws[k*this->dimension+i] /= (probSAA * this->R);
 
         /* update gradient with respect to constant term */  
-		double increment =  summationTerm[k]/(probSAA * this->R * this->numSamples);
+		double increment =  summationTerm[k]/(probSAA * this->R);
 		#pragma omp atomic
         constantGrad[k] += increment;		 
         /* update gradient with respect to mean */
         for(int i= this->xfeature.row_offset[sampleID]; i<xfeature.row_offset[sampleID+1];i++) 
 		{
-        	increment =  summationTerm[k]/(probSAA * this->R * this->numSamples) 
+        	increment =  summationTerm[k]/(probSAA * this->R) 
 					* xfeature.val[i];
 			#pragma omp atomic
 			meanGrad.meanVectors[k][xfeature.col[i]] += increment;
@@ -316,7 +317,7 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 
 
 void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
-		int maxEpochs, OptHistory &history, bool writeHistory)
+		int maxEpochs, OptHistory &history, bool writeHistory, bool adaptiveStop)
 {
 	/*
 	*	fit Sample Average Approximated marginal log-likelihood with SGD 
@@ -334,10 +335,10 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 	{
 		history.iterTime.push_back(0.0);
 		history.fobj.push_back(this->objValue()); 
-		std::cout << "intial objective value " << history.fobj[0] << std::endl;	
+		std::cerr << "intial objective value " << history.fobj[0] << std::endl;	
 		history.gradNormSq.push_back(this->gradNormSq(meanGrad, covGrad,
 				constantGrad, CommonUtility::numSecondaryThreads));
-		std::cout << "Initial squared l2-norm of gradient: " 
+		std::cerr << "Initial squared l2-norm of gradient: " << std::setprecision(8)
 				<< history.gradNormSq[0] << std::endl;	
 	}
 	struct timeval start, finish;
@@ -346,11 +347,12 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 	for(int t=0; t<maxEpochs; t++)
 	{
 		gettimeofday(&start,nullptr) ; // set timer start 
-		ClassMeans meanOld(this->means);
-		BlockCholeskey covOld(this->covCholeskey);
-		std::vector<double> constantsOld(this->classConstants);
+		ClassMeans meanGradOld(this->means);
+		BlockCholeskey covGradOld(this->covCholeskey);
+		std::vector<double> constantGradOld(this->classConstants);
+		double stoppingCosine = 0.0;
 		#pragma omp parallel num_threads(CommonUtility::numThreads)\
-		firstprivate(meanGrad,covGrad,constantGrad) 
+		firstprivate(meanGrad,covGrad,constantGrad, meanGradOld, covGradOld, constantGradOld) 
 		{
         int nThreads = omp_get_num_threads();	
 		int tid = omp_get_thread_num();	
@@ -381,10 +383,37 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 			this->covCholeskey -= covGrad;
 			// update constants
 			for(int k=0; k<this->numClass; k++)
-				classConstants[k] -= stepsize * constantGrad[k];		
+				#pragma omp atomic
+				this->classConstants[k] -= stepsize * constantGrad[k];	
+			// update average inner product stopping measure
+			if(adaptiveStop && n>=1)
+			{
+			    if(sqrt(covGrad.l2normsq()) * sqrt(covGradOld.l2normsq()) > 0.0)
+					#pragma omp atomic
+					stoppingCosine += covGrad.innerProduct(covGradOld)
+						/(sqrt(covGrad.l2normsq()) * sqrt(covGradOld.l2normsq()));
+
+				if(sqrt(meanGrad.l2normsq()) * sqrt(meanGradOld.l2normsq()) > 0.0)
+					#pragma omp atomic
+					stoppingCosine += meanGrad.innerProduct(meanGradOld)
+						/(sqrt(meanGrad.l2normsq()) * sqrt(meanGradOld.l2normsq()));
+
+				double constantInnerProd = 0.0;
+				double constantGradNorm = 0.0;
+				double constantGradOldNorm = 0.0;
+				for(int k=0; k<this->numClass; k++)
+				{
+					constantInnerProd += constantGrad[k] * constantGradOld[k];
+					constantGradNorm += constantGrad[k] * constantGrad[k];
+					constantGradOldNorm += constantGradOld[k] * constantGradOld[k];
+				}
+			}
+			covGradOld = covGrad;
+			meanGradOld = meanGrad;
+			constantGradOld = constantGrad;
+
 		}	
 		} //pragma omp parallel
-		
 		/***********************************************************************/	
 		/***************** record optimization progress ************************/
 		
@@ -397,14 +426,29 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 
 			history.gradNormSq.push_back(this->gradNormSq(meanGrad, covGrad,
 					constantGrad, CommonUtility::numSecondaryThreads));
-			std::cout << "squared l2-norm of gradient after " << t+1 
+			std::cerr << "squared l2-norm of gradient after " << t+1 
 					<<" iterations of SGD: " << history.gradNormSq[t+1] << std::endl;
 		
 			history.fobj.push_back(this->objValue());
-			std::cout << "objective value after " << t+1 << " iterations of SGD: " 
+			std::cerr << "objective value after " << t+1 << " iterations of SGD: " 
 					<< history.fobj[t+1] << std::endl;
 		}
-
+		// stopping condition check
+		if(adaptiveStop)
+		{
+			stoppingCosine /= this->numSamples;
+			std::cerr << "cosine angle between gradients: " << stoppingCosine << std::endl;
+		}
+		if(adaptiveStop && stoppingCosine < 0)
+		{
+			std::cerr << "gradient exit condition met, exit SGD\n";
+			break;
+		}
+		if(adaptiveStop && writeHistory && history.fobj[t+1] > history.fobj[t])
+		{
+			std::cerr << "function value exit condition met, exit SGD\n";
+			break;
+		}
 		/***********************************************************************/	
 	}	
 } //MxlGaussianBlockDiag::fit_by_SGD
@@ -413,6 +457,10 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum, 
 		double momentumShrinkage, int maxIter, OptHistory &history, bool writeHistory)
 {
+	/* 
+		accelerated gradient with adaptive momentum, 
+		"Convergence Analysis of Proximal Gradient with Momentum for Nonconvex Optimization"
+	*/
 
 	ClassMeans meanGrad(this->numClass, this->dimension, true);
 	BlockCholeskey covGrad(this->numClass, this->dimension, true);
@@ -439,7 +487,7 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 	{
 		history.iterTime.push_back(0.0);
 		history.fobj.push_back(this->objValue()); 
-		std::cout << "intial objective value " << history.fobj[0] << std::endl;	
+		std::cerr << "intial objective value " << history.fobj[0] << std::endl;	
 	}
 	struct timeval start, finish;
 	/***************************************************************************/
@@ -453,6 +501,11 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 		#pragma omp parallel for num_threads(CommonUtility::numThreads) 
 		for(int n=0; n<this->numSamples; n++)
 			this->gradient(n,constantGrad, meanGrad, covGrad);
+
+		for(int k=0; k<this->numClass; k++)
+			constantGrad[k] /= this->numSamples;
+		meanGrad *= (1.0/this->numSamples);
+		covGrad	 *= (1.0/this->numSamples);
     	gettimeofday(&finish,nullptr) ; // pause timer 
 
 		if(writeHistory)
@@ -461,7 +514,7 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 			history.iterTime[t+1] += (finish.tv_usec-start.tv_usec)/(1000.0 * 1000.0); 
 			//accounting for size of gradient
 			history.gradNormSq.push_back(this->l2normsq(meanGrad,covGrad,constantGrad));
-			std::cout << "squared l2-norm of gradient after " << t
+			std::cerr << "squared l2-norm of gradient after " << t
 					<<" iterations of APG: " << history.gradNormSq[t] << std::endl;
 		}
 
@@ -506,7 +559,7 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 			if(writeHistory)
 			{
 				history.fobj.push_back(obj_x); 
-				std::cout << "objective value after " << t+1 << " iterations of APG: "
+				std::cerr << "objective value after " << t+1 << " iterations of APG: "
 						  << history.fobj[t+1] << std::endl;	
 			}
 		} else 
@@ -518,23 +571,43 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 			if(writeHistory)
 			{
 				history.fobj.push_back(obj_v); 
-				std::cout << "objective value after " << t+1 << " iterations of APG: "
+				std::cerr << "objective value after " << t+1 << " iterations of APG: "
 						<< history.fobj[t+1] << std::endl;	
 			}
 		}
 		/***********************************************************************/
-			
 	}
 	
 	if (writeHistory)
 	{
 		history.gradNormSq[maxIter] = this->gradNormSq(meanGrad, covGrad,
 				constantGrad, CommonUtility::numSecondaryThreads);
-		std::cout << "squared l2-norm of gradient after " << maxIter
+		std::cerr << "squared l2-norm of gradient after " << maxIter
 				<<" iterations of APG: " << history.gradNormSq[maxIter] << std::endl;
 	}
 } //fit_by_APG
 
+
+void MxlGaussianBlockDiag::fit_by_Hybrid(double stepsizeSGD,
+		double stepsizeAGD, double momentum, double momentumShrinkage,
+		int maxEpochs, OptHistory &history, bool writeHistory)
+{
+		/* hybrid algorithm adaptive stop SGD + AGD */
+	    this->fit_by_SGD(stepsizeSGD, maxEpochs, history, true, true);   
+		int epochsRunSGD = history.fobj.size()-1;  
+		int epochsRunAGD = maxEpochs-epochsRunSGD;
+		if(epochsRunAGD > 0)
+		{
+			OptHistory historyAGD(epochsRunAGD);
+			this->fit_by_APG(stepsizeAGD, momentum, momentumShrinkage, epochsRunAGD, historyAGD, true);
+			for(int t=0; t<historyAGD.fobj.size(); t++)
+				history.fobj.push_back(historyAGD.fobj[t]);
+			for(int t=0; t<historyAGD.gradNormSq.size(); t++)
+				history.gradNormSq.push_back(historyAGD.gradNormSq[t]);
+			for(int t=0; t<historyAGD.iterTime.size(); t++)
+				history.iterTime.push_back(historyAGD.iterTime.back()+historyAGD.iterTime[t]);
+		}
+}
 
 double MxlGaussianBlockDiag::l2normsq(const ClassMeans &mean1,
 		const BlockCholeskey &cov1,
@@ -584,6 +657,10 @@ double MxlGaussianBlockDiag::gradNormSq(ClassMeans &meanGrad,
 	for(int n=0; n<this->numSamples; n++)
 		this->gradient(n,constantGrad, meanGrad, covGrad);
 	
+	for(int k=0; k<this->numClass; k++)
+		constantGrad[k] *= (1.0/this->numSamples);
+	meanGrad *= (1.0/this->numSamples);
+	covGrad  *= (1.0/this->numSamples);
 	double gradnorm = this->l2normsq(meanGrad,covGrad,constantGrad);
 	return gradnorm;
 }

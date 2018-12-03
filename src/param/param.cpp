@@ -65,6 +65,25 @@ void BlockCholeskey::setzero()
 }
 
 
+double BlockCholeskey::innerProduct(const BlockCholeskey &bchol2) const
+{
+	try
+	{
+		if(this->numClass != bchol2.numClass || this->dimension != bchol2.dimension )
+			throw "numClass or dimension does not match\n";
+	} catch (char const* msg) {
+		std::cerr<< msg << std::endl;
+		exit(1);
+	}
+	double prod = 0.0;
+	for(int k=0; k<this->numClass; k++)
+	{
+		for(int i=0; i<this->factorArray[k].nnz; i++)
+			prod += this->factorArray[k].val[i]*bchol2.factorArray[k].val[i];
+	}	
+	return prod;
+}
+
 double BlockCholeskey::l2normsq() const
 {
 	double norm = 0.0;
@@ -87,7 +106,8 @@ BlockCholeskey& BlockCholeskey::operator-= (BlockCholeskey const &bcholRHS)
 		if (this->dimension != bcholRHS.dimension)
 			throw "dimension in LHS and RHS does not match\n";
 	} catch (const char* msg) {
-		std::cout << msg << std::endl;
+		std::cerr<< msg << std::endl;
+		exit(1);
 	}
 	for(int k=0; k<this->numClass; k++)
 	{
@@ -108,6 +128,7 @@ BlockCholeskey BlockCholeskey::operator- (BlockCholeskey const &bcholRHS) const
 			throw "dimension in LHS and RHS does not match\n";
 	} catch (const char* msg) {
 		std::cout << msg << std::endl;
+		exit(1);
 	}
 
 	BlockCholeskey res(*this);
@@ -131,6 +152,7 @@ BlockCholeskey BlockCholeskey::operator+ (BlockCholeskey const &bcholRHS) const
 			throw "dimension in LHS and RHS does not match\n";
 	} catch (const char* msg) {
 		std::cout << msg << std::endl;
+		exit(1);
 	}
 
 	BlockCholeskey res(*this);
@@ -227,6 +249,27 @@ void ClassMeans::setzero()
 }
 
 
+double ClassMeans::innerProduct(const ClassMeans &clmeans2) const
+{
+	try{
+		if(this->numClass != clmeans2.numClass || this->dimension != clmeans2.dimension)
+			throw "dimension does not matched\n";
+	} catch (char const* msg)
+	{
+		std::cerr << msg << std::endl;
+	
+	}
+
+	double prod = 0.0;
+	for(int k=0; k<this->numClass; k++)
+	{
+		for(int i=0; i<this->meanVectors[k].size(); i++)
+			prod += this->meanVectors[k][i]*clmeans2.meanVectors[k][i];
+	}
+	return prod;
+}
+
+
 double ClassMeans::l2normsq() const
 {
 	double norm = 0.0;
@@ -249,6 +292,7 @@ ClassMeans& ClassMeans::operator-= (ClassMeans const &clmsRHS)
 			throw "dimension in LHS and RHS does not match\n";
 	} catch (const char* msg) {
 		std::cout << msg << std::endl;
+		exit(1);
 	}
 
 	for(int k=0; k<this->numClass; k++)
@@ -271,6 +315,7 @@ ClassMeans ClassMeans::operator- (ClassMeans const &clmsRHS) const
 			throw "dimension in LHS and RHS does not match\n";
 	} catch (const char* msg) {
 		std::cout << msg << std::endl;
+		exit(1);
 	}
 
 	ClassMeans res(*this);
@@ -371,6 +416,7 @@ Beta& Beta::operator-= (Beta const& otherBeta)
 			throw "dimension in LHS and RHS does not match\n";
 	} catch (const char* msg) {
 		std::cout << msg << std::endl;
+		exit(1);
 	}
 
 	for(int k=0; k<this->numClass-1; k++)
@@ -393,6 +439,7 @@ Beta Beta::operator- (Beta const &otherBeta) const
 			throw "dimension in LHS and RHS does not match\n";
 	} catch (const char* msg) {
 		std::cout << msg << std::endl;
+		exit(1);
 	}
 
 	Beta res(*this);
@@ -415,6 +462,7 @@ Beta Beta::operator+ (Beta const &otherBeta) const
 			throw "dimension in LHS and RHS does not match\n";
 	} catch (const char* msg) {
 		std::cout << msg << std::endl;
+		exit(1);
 	}
 
 	Beta res(*this);

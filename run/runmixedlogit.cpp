@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     int numClass=4;
     int numThreads=1;
     char *oPrefix=NULL;
-	double shrinkage = 0.0001;
+	double shrinkage = 0.5;
 
     char hostname[100];
     gethostname (hostname, 100);
@@ -103,6 +103,7 @@ int main(int argc, char **argv)
     std::cerr << "number of threads : " << numThreads << std::endl;
     std::cerr << "number of output classes :" << numClass << std::endl;
     std::cerr << "step-size : " << stepsize << std::endl;
+    std::cerr << "acceleration momentum (if used) : " << momentum << std::endl;
     std::cerr << "number of epochs : " << maxEpoch << std::endl;
     std::cerr << "number of draws : " << R << std::endl;
 
@@ -110,7 +111,7 @@ int main(int argc, char **argv)
     ReadDenseInput(input_filename, &data);   
 	CSR_matrix xf = Dense2CSR(data);
 	MxlGaussianBlockDiag gmxl1 = MxlGaussianBlockDiag(xf, data.label,
-						 numClass, xf.number_cols, false, 100);
+						 numClass, xf.number_cols, true, 100);
    
 	OptHistory optHistory(maxEpoch); 
     
@@ -119,19 +120,25 @@ int main(int argc, char **argv)
 	    gmxl1.fit_by_APG(stepsize, momentum, shrinkage, maxEpoch, optHistory, true);	
     } else if (alg == "SGD")
     {
-	    gmxl1.fit_by_SGD(stepsize, maxEpoch, optHistory,  true);        
+	    gmxl1.fit_by_SGD(stepsize, maxEpoch, optHistory,  true, false);        
+    } else if (alg == "HYB" || alg == "HYBRID" || alg == "hybrid")
+    {
+        gmxl1.fit_by_Hybrid(stepsize, stepsize, momentum, shrinkage, 
+            maxEpoch, optHistory, true);
     } else 
     {
-        std::cerr << "unrecognized -a input. Available algorithms: SGD, ALG, HYBRID \n";
+        std::cerr << "unrecognized -a input. Available algorithms: SGD, AGD, HYBRID \n";
+        exit(1);
     }
 	
 	char outfilestr[200];
     sprintf (outfilestr, "%s_%s_t%d_r%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, stepsize, maxEpoch);
-    std::cout << "output file name: " << outfilestr << std::endl;
+    std::cerr << "output file name: " << outfilestr << std::endl;
 	std::ofstream ofs(outfilestr);
     if (ofs.fail())
     {
-        std::cout << "Failed to open outputfile.\n";
+        std::cerr << "Failed to open outputfile.\n";
+        exit(1);
     }
 
 	for(int t=0; t<optHistory.fobj.size(); t++)
@@ -141,6 +148,33 @@ int main(int argc, char **argv)
 
 	}
 	ofs.close();
-	
+    ofs.clear();
+	char paramfile[200];
+    sprintf (paramfile, "%s_%s_t%d_r%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, stepsize, maxEpoch);
+    ofs.open(paramfile);
+    if (ofs.fail())
+    {
+        std::cerr << "Failed to open param outputfile.\n";
+        exit(1);
+    }
+
+    std::vector<double> constants = gmxl1.getConstants();
+    ClassMeans means = gmxl1.getMeans();
+    BlockCholeskey cov = gmxl1.getCovCholeskey();
+
+    for(int k=0; k<constants.size(); k++)
+        ofs << constants[k] << std::endl;
+    for(int k=0; k<means.numClass; k++)
+    {
+        for(int i=0; i<means.dimension; i++)
+            ofs << means.meanVectors[k][i] << std::endl;
+    }  
+    for(int k=0; k<cov.numClass; k++)
+    {
+        for(int i=0; i<cov.dimension; i++)
+            ofs << cov.factorArray[k].val[i]<< std::endl;
+    }  	
+	ofs.close();	
+
 	return 0;
 }

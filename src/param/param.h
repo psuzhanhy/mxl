@@ -26,6 +26,7 @@ struct BlockCholeskey: public LogisticParam
 	BlockCholeskey operator+ (BlockCholeskey const &bcholRHS) const;
 	BlockCholeskey& operator*= (double scalar);
 	BlockCholeskey operator* (double scalar);
+	double innerProduct(const BlockCholeskey &bchol2) const;
 	bool operator== (BlockCholeskey const& bcholRHS);
 	
 };
@@ -42,7 +43,7 @@ struct ClassMeans: public LogisticParam
 	ClassMeans operator+ (ClassMeans const &clmsRHS) const;
 	ClassMeans& operator*= (double scalar);
 	ClassMeans operator* (double scalar);
-
+	double innerProduct(const ClassMeans &clmeans2) const;
 };
 
 struct Beta: public LogisticParam
