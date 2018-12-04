@@ -132,7 +132,7 @@ int main(int argc, char **argv)
     }
 	
 	char outfilestr[200];
-    sprintf (outfilestr, "%s_%s_t%d_r%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, stepsize, maxEpoch);
+    sprintf (outfilestr, "%s_%s_t%d_r%.1lf_m%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, stepsize, momentum, maxEpoch);
     std::cerr << "output file name: " << outfilestr << std::endl;
 	std::ofstream ofs(outfilestr);
     if (ofs.fail())
@@ -150,7 +150,7 @@ int main(int argc, char **argv)
 	ofs.close();
     ofs.clear();
 	char paramfile[200];
-    sprintf (paramfile, "%s_%s_t%d_r%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, stepsize, maxEpoch);
+    sprintf (paramfile, "%s_%s_t%d_r%.1lf_m%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, stepsize, momentum, maxEpoch);
     ofs.open(paramfile);
     if (ofs.fail())
     {
