@@ -58,6 +58,7 @@ struct Beta: public LogisticParam
 	Beta operator* (double scalar);	
 	double l2normsq() const;
 	void setzero();
+	double innerProduct(const Beta &otherBeta) const;
 };
 
 

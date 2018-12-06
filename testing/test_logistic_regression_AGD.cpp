@@ -35,7 +35,7 @@ int main(int argc, char **argv)
    
 	OptHistory optHistory(maxIter); 
 	bool writeHistory = true;
-	lr.proximalGD(stepsize, maxIter, optHistory, writeHistory);	
+	lr.proximalAGD(stepsize, maxIter, optHistory, writeHistory);	
     
 	char outfilestr[200];
     sprintf (outfilestr, "testlr_fitAGD.txt");

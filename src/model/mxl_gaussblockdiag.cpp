@@ -359,7 +359,7 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 		std::vector<double> ordering(this->numSamples/nThreads);	
 		for(int n=0; n<this->numSamples/nThreads; n++)
 		{
-			ctr[0] = t;
+			ctr[0] = t+numSamples/nThreads * tid + n;
 			ctr[1] = numSamples/nThreads * tid + n;
 			//unif(-1,1)
         	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); 
@@ -441,12 +441,12 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 		}
 		if(adaptiveStop && stoppingCosine < 0)
 		{
-			std::cerr << "gradient exit condition met, exit SGD\n";
+			std::cerr << "gradient stopping criterion met, exit SGD\n";
 			break;
 		}
 		if(adaptiveStop && writeHistory && history.fobj[t+1] > history.fobj[t])
 		{
-			std::cerr << "function value exit condition met, exit SGD\n";
+			std::cerr << "function value stopping condition met, exit SGD\n";
 			break;
 		}
 		/***********************************************************************/	
@@ -580,10 +580,10 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 	
 	if (writeHistory)
 	{
-		history.gradNormSq[maxIter] = this->gradNormSq(meanGrad, covGrad,
-				constantGrad, CommonUtility::numSecondaryThreads);
+		history.gradNormSq.push_back(this->gradNormSq(meanGrad, covGrad,
+				constantGrad, CommonUtility::numSecondaryThreads));
 		std::cerr << "squared l2-norm of gradient after " << maxIter
-				<<" iterations of APG: " << history.gradNormSq[maxIter] << std::endl;
+				<<" iterations of APG: " << history.gradNormSq.back() << std::endl;
 	}
 } //fit_by_APG
 
@@ -600,12 +600,12 @@ void MxlGaussianBlockDiag::fit_by_Hybrid(double stepsizeSGD,
 		{
 			OptHistory historyAGD(epochsRunAGD);
 			this->fit_by_APG(stepsizeAGD, momentum, momentumShrinkage, epochsRunAGD, historyAGD, true);
-			for(int t=0; t<historyAGD.fobj.size(); t++)
+			for(int t=1; t<historyAGD.fobj.size(); t++)
 				history.fobj.push_back(historyAGD.fobj[t]);
-			for(int t=0; t<historyAGD.gradNormSq.size(); t++)
+			for(int t=1; t<historyAGD.gradNormSq.size(); t++)	
 				history.gradNormSq.push_back(historyAGD.gradNormSq[t]);
-			for(int t=0; t<historyAGD.iterTime.size(); t++)
-				history.iterTime.push_back(historyAGD.iterTime.back()+historyAGD.iterTime[t]);
+			for(int t=1; t<historyAGD.iterTime.size(); t++)
+				history.iterTime.push_back(history.iterTime.back()+historyAGD.iterTime[t]);
 		}
 }
 

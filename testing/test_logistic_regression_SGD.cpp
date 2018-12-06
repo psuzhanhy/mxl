@@ -36,7 +36,7 @@ int main(int argc, char **argv)
    
 	OptHistory sgdHistory(maxIter); 
 	bool writeHistory = true;
-	lr.proximalSGD(stepsize, batchSize, maxIter, sgdHistory, writeHistory);	
+	lr.proximalSGD(stepsize, "decreasing", batchSize, maxIter, sgdHistory, writeHistory, false);	
     
 	char outfilestr[200];
     sprintf (outfilestr, "testlr_SGD.txt");

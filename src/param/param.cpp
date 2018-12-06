@@ -518,3 +518,24 @@ double Beta::l2normsq() const
 	}
 	return norm;
 }
+
+
+double Beta::innerProduct(const Beta &otherBeta) const
+{
+	try{
+		if(this->numClass != otherBeta.numClass || this->dimension != otherBeta.dimension)
+			throw "dimension does not matched\n";
+	} catch (char const* msg)
+	{
+		std::cerr << msg << std::endl;
+	
+	}
+
+	double innerProd = 0.0;
+	for(int k=0; k<this->numClass-1; k++)
+	{
+		for(int i=0; i<this->dimension;i++)
+			innerProd += this->beta[k][i] * otherBeta.beta[k][i];
+	}
+	return innerProd;
+}

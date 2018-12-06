@@ -30,15 +30,18 @@ class LogisticRegression : public Logistic
                 Beta& beta, std::vector<double> &intercept,
                 Beta& betaGrad, std::vector<double> &interceptGrad);
                 
- 	    void proximalSGD(double initStepSize, int batchSize, int maxIter, 
-                OptHistory &history, bool writeHistory);  
+ 	    void proximalSGD(double initStepSize, std::string stepsizeRule, int batchSize,
+                int maxIter, OptHistory &history, bool writeHistory, bool adaptiveStop);  
 
-        void proximalGD(double stepSize, int maxIter, 
+        void proximalAGD(double stepSize, int maxIter, 
                 OptHistory &history, bool writeHistory);
 
-        void proximalHybridGD(double stepSize, int maxIter, 
+        void proximalHybridBatchingGD(double stepSize, int maxIter, 
                 OptHistory &history, bool writeHistory);
 
+        void hybridFirstOrder(double initSGDStepSize, int batchSizeSGD, std::string stepsizeRuleSGD, double stepSizeAGD,
+                int maxIter, OptHistory &history);
+            
 		virtual double negativeLogLik() override;
 
         double negativeLogLik(Beta& beta, std::vector<double> &intercept);

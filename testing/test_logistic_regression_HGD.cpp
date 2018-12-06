@@ -35,7 +35,7 @@ int main(int argc, char **argv)
    
 	OptHistory sgdHistory(maxIter); 
 	bool writeHistory = true;
-	lr.proximalHybridGD(stepsize, maxIter, sgdHistory, writeHistory);	
+	lr.proximalHybridBatchingGD(stepsize, maxIter, sgdHistory, writeHistory);	
     
 	char outfilestr[200];
     sprintf (outfilestr, "testlr_HybridGD.txt");
