@@ -123,7 +123,7 @@ int main(int argc, char **argv)
     
     if (alg == "AGD")
     {
-	    lr.proximalAGD(stepSizeSGD, maxEpoch, optHistory, true);	
+	    lr.proximalAGD(stepSizeAGD, maxEpoch, optHistory, true);	
     } else if (alg == "SGD")
     {
         int maxIter = maxEpoch * n / batchSize;
