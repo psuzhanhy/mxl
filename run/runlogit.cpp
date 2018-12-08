@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     char hostname[100];
     gethostname (hostname, 100);
     std::cout << "hostname " << hostname << std::endl;
-	std::cout << "estimating mixed logit model with diagonal Gaussian mixing distribution  \n";
+	std::cout << "estimating fixed effect logit model \n";
     static struct option long_options[] =
     {
         {"Algorithm", required_argument, 0, 'a'},

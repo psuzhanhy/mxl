@@ -345,8 +345,13 @@ void LogisticRegression::proximalSGD(double initStepSize, std::string stepsizeRu
 			}
 
 			if(adaptiveStop && writeHistory && history.fobj.back() > *(history.fobj.rbegin()+1))
+			{
 				stoppingCounter++;
+				if (stepsizeRule == "funcvaladapt")
+					stepsize *= 0.5;
+			}
 		}
+
 		if(stoppingCounter>=10)
 		{
 			std::cerr << "function value stopping condition met after " <<  effectivePass << " epochs, exit SGD\n";
@@ -569,9 +574,16 @@ void LogisticRegression::proximalAGD(double stepSize,
 		betaTemp -= betaGrad * stepSize;
 		proximalL1(betaTemp);
 		// acceleration 
-		theta_new = (1 + sqrt(1 + 4 * theta * theta))/2;
-		momentum = (theta - 1)/theta_new;
-		theta = theta_new;
+		if (this->_l1Lambda > 0)
+		{
+			theta_new = (1 + sqrt(1 + 4 * theta * theta))/2;
+			momentum = (theta - 1)/theta_new;
+			theta = theta_new;
+		} else 
+		{
+			momentum = (double)t/(t+3.0);
+		}
+
 		betaAccelerated = betaTemp + (betaTemp - betaOld) * momentum;
 		betaOld = betaTemp;
 		for(int k=0; k<numClass-1; k++)
