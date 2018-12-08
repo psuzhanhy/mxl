@@ -345,11 +345,11 @@ void LogisticRegression::proximalSGD(double initStepSize, std::string stepsizeRu
 			}
 
 			if(adaptiveStop && writeHistory && history.fobj.back() > *(history.fobj.rbegin()+1))
-			{
-				stoppingCounter++;
-				if (stepsizeRule == "funcvaladapt")
-					stepsize *= 0.5;
-			}
+				stoppingCounter++;	
+
+			if(stepsizeRule == "funcvaladapt" && writeHistory && history.fobj.back() > *(history.fobj.rbegin()+1))
+				stepsize *= 0.5;
+			
 		}
 
 		if(stoppingCounter>=10)
