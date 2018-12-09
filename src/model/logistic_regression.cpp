@@ -308,13 +308,15 @@ void LogisticRegression::proximalSGD(double initStepSize, std::string stepsizeRu
 		betaGrad *= (1.0/batchSize);
 		l2Regularizer_Gradient(betaTemp, betaGrad); //add gradient wrt L2 term
 		betaTemp -= betaGrad * stepsize;
-		
+		if (stepsizeRule == "iterdecreasing")
+			stepsize = initStepSize/(t+1);
+	
 		// proximal operator 
 		proximalL1(betaTemp);
 		if(countDataPass/this->numSamples>effectivePass)
 		{
 			effectivePass++;
-			if (stepsizeRule == "decreasing")
+			if (stepsizeRule == "epochdecreasing")
 				stepsize = initStepSize/(effectivePass+1);
 
 			if (writeHistory)
