@@ -67,15 +67,15 @@ class MxlGaussianBlockDiag : public Logistic
 		void gradient(int sampleID, std::vector<double> &constantGrad,
 				ClassMeans &meanGrad, BlockCholeskey &covGrad);
 
-		void fit_by_SGD(double stepsize, int maxEpochs, 
+		void fit_by_SGD(double stepsize, std::string stepsizeRule, int maxEpochs, 
 				OptHistory &history, bool writeHistory, bool adaptiveStop);
 
 		void fit_by_APG(double stepsize, double momentum, 
 				double momentumShrinkage, int maxIter,
 				OptHistory &history, bool writeHistory);
 
-		void fit_by_Hybrid(double stepsizeSGD, double stepsizeAGD, 
-				double momentum, double momentumShrinkage,
+		void fit_by_Hybrid(double stepsizeSGD, std::string stepsizeRule, 
+				double stepsizeAGD, double momentum, double momentumShrinkage,
 				int maxEpochs, OptHistory &history, bool writeHistory);
 				
 		double l2normsq(const ClassMeans &mean1,

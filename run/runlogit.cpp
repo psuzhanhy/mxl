@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     int maxEpoch = 10;
     double stepSizeSGD=0.1;
     double stepSizeAGD=0.1;
-    std::string sgdStepRule("decreasing");
+    std::string sgdStepRule("epochdecreasing");
     int numClass=4;
     int numThreads=1;
     char *oPrefix=NULL;
@@ -91,8 +91,8 @@ int main(int argc, char **argv)
         std::cerr << "      -t INT        number of threads [1]\n";
         std::cerr << "      -c INT        number of output classes [4]\n";
         std::cerr << "      -r REAL       initial SGD step-size [0.1]\n";
-            std::cerr << "  -s REAL       AGD step-size [0.1]\n";
-        std::cerr << "      -d STRING     SGD step-size Rule [decreasing]\n";
+        std::cerr << "      -s REAL       AGD step-size [0.1]\n";
+        std::cerr << "      -d STRING     SGD step-size Rule [epochdecreasing]\n";
         std::cerr << "      -e INT        number of epochs [10]\n";
         std::cerr << "      -o STRING     output file prefix (Required)\n";
         return 1;

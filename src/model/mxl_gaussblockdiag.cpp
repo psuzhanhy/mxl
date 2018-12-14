@@ -316,7 +316,7 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 } //MxlGaussianBlockDiag::gradient
 
 
-void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
+void MxlGaussianBlockDiag::fit_by_SGD(double stepsize, std::string stepsizeRule,
 		int maxEpochs, OptHistory &history, bool writeHistory, bool adaptiveStop)
 {
 	/*
@@ -326,7 +326,7 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 	ClassMeans meanGrad(this->numClass, this->dimension, true);
 	BlockCholeskey covGrad(this->numClass, this->dimension, true);
 	std::vector<double> constantGrad(this->numClass);
-
+	double learningRate = stepsize;
 	CommonUtility::CBRNG g;
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
     CommonUtility::CBRNG::key_type key = {{}};	
@@ -344,13 +344,13 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 	struct timeval start, finish;
 	/***************************************************************************/
 	/********************* start SGD *******************************************/	
+	int globalIterCounter = 0;
 	for(int t=0; t<maxEpochs; t++)
 	{
 		gettimeofday(&start,nullptr) ; // set timer start 
 		ClassMeans meanGradOld(this->means);
 		BlockCholeskey covGradOld(this->covCholeskey);
 		std::vector<double> constantGradOld(this->classConstants);
-		double stoppingCosine = 0.0;
 		#pragma omp parallel num_threads(CommonUtility::numThreads)\
 		firstprivate(meanGrad,covGrad,constantGrad, meanGradOld, covGradOld, constantGradOld) 
 		{
@@ -368,46 +368,30 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 			int r = 0.5 * (x + 1.0) * (this->numSamples-1);
 			ordering[n] = r;
 		}
+		if (stepsizeRule == "epochdecreasing")
+			learningRate = stepsize / (t+1);
+
 		for(int n=0; n<this->numSamples/nThreads; n++)
 		{
+			globalIterCounter++;
+			if (stepsizeRule == "iterdecreasing")
+				learningRate = stepsize / ((double) globalIterCounter);
 			std::fill(constantGrad.begin(), constantGrad.end(), 0.0);
 			covGrad.setzero();
 			meanGrad.setzero();
 
 			this->gradient(ordering[n],constantGrad, meanGrad, covGrad);
 			// update mean
-			meanGrad *= stepsize;
+			meanGrad *= learningRate;
 			this->means -= meanGrad;
 			// update covariance
-			covGrad *= stepsize;
+			covGrad *= learningRate;
 			this->covCholeskey -= covGrad;
 			// update constants
 			for(int k=0; k<this->numClass; k++)
 				#pragma omp atomic
-				this->classConstants[k] -= stepsize * constantGrad[k];	
-			// update average inner product stopping measure
-			if(adaptiveStop && n>=1)
-			{
-			    if(sqrt(covGrad.l2normsq()) * sqrt(covGradOld.l2normsq()) > 0.0)
-					#pragma omp atomic
-					stoppingCosine += covGrad.innerProduct(covGradOld)
-						/(sqrt(covGrad.l2normsq()) * sqrt(covGradOld.l2normsq()));
-
-				if(sqrt(meanGrad.l2normsq()) * sqrt(meanGradOld.l2normsq()) > 0.0)
-					#pragma omp atomic
-					stoppingCosine += meanGrad.innerProduct(meanGradOld)
-						/(sqrt(meanGrad.l2normsq()) * sqrt(meanGradOld.l2normsq()));
-
-				double constantInnerProd = 0.0;
-				double constantGradNorm = 0.0;
-				double constantGradOldNorm = 0.0;
-				for(int k=0; k<this->numClass; k++)
-				{
-					constantInnerProd += constantGrad[k] * constantGradOld[k];
-					constantGradNorm += constantGrad[k] * constantGrad[k];
-					constantGradOldNorm += constantGradOld[k] * constantGradOld[k];
-				}
-			}
+				this->classConstants[k] -= learningRate * constantGrad[k];	
+			
 			covGradOld = covGrad;
 			meanGradOld = meanGrad;
 			constantGradOld = constantGrad;
@@ -433,22 +417,18 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize,
 			std::cerr << "objective value after " << t+1 << " iterations of SGD: " 
 					<< history.fobj[t+1] << std::endl;
 		}
-		// stopping condition check
-		if(adaptiveStop)
-		{
-			stoppingCosine /= this->numSamples;
-			std::cerr << "cosine angle between gradients: " << stoppingCosine << std::endl;
-		}
-		if(adaptiveStop && stoppingCosine < 0)
-		{
-			std::cerr << "gradient stopping criterion met, exit SGD\n";
-			break;
-		}
+		// stopping condition check	
 		if(adaptiveStop && writeHistory && history.fobj[t+1] > history.fobj[t])
 		{
 			std::cerr << "function value stopping condition met, exit SGD\n";
 			break;
 		}
+		if (writeHistory && stepsizeRule == "funcvaladapt")
+		{
+			if (history.fobj[t+1] > history.fobj[t])
+				learningRate *= 0.5;
+		}
+
 		/***********************************************************************/	
 	}	
 } //MxlGaussianBlockDiag::fit_by_SGD
@@ -588,12 +568,12 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 } //fit_by_APG
 
 
-void MxlGaussianBlockDiag::fit_by_Hybrid(double stepsizeSGD,
+void MxlGaussianBlockDiag::fit_by_Hybrid(double stepsizeSGD, std::string stepsizeRule,
 		double stepsizeAGD, double momentum, double momentumShrinkage,
 		int maxEpochs, OptHistory &history, bool writeHistory)
 {
 		/* hybrid algorithm adaptive stop SGD + AGD */
-	    this->fit_by_SGD(stepsizeSGD, maxEpochs, history, true, true);   
+	    this->fit_by_SGD(stepsizeSGD, stepsizeRule, maxEpochs, history, true, true);   
 		int epochsRunSGD = history.fobj.size()-1;  
 		int epochsRunAGD = maxEpochs-epochsRunSGD;
 		if(epochsRunAGD > 0)

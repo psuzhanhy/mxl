@@ -20,9 +20,10 @@ int main(int argc, char **argv)
     char *input_filename;
     DenseData data;
     std::string alg("SGD");
+    std::string sgdStepRule("decreasing");
     int R = 1000;
     int maxEpoch = 10;
-    double stepsize=1.0;
+    double stepsize=0.1;
     double momentum=1.0;
     int numClass=4;
     int numThreads=1;
@@ -39,6 +40,7 @@ int main(int argc, char **argv)
         {"R", required_argument, 0, 'R'},
         {"epochs", required_argument, 0, 'e'},
         {"step-size", required_argument, 0, 'r'},
+        {"SGD step-size rule", optional_argument, 0, 'd'},
         {"momentum", optional_argument, 0, 'm'},
         {"classes", required_argument, 0, 'c'},
         {"nthreads", required_argument, 0, 't'},
@@ -49,7 +51,7 @@ int main(int argc, char **argv)
     while (1)
     {
         int option_index = 0;
-        c = getopt_long (argc, argv, "a:R:e:r:m:c:t:o:", long_options, &option_index);
+        c = getopt_long (argc, argv, "a:R:e:r:d:m:c:t:o:", long_options, &option_index);
         if (c==-1) break;
         switch (c)
         {
@@ -64,6 +66,9 @@ int main(int argc, char **argv)
                 break;
             case 'r':
                 stepsize=(double)atof(optarg);
+                break;
+            case 'd':
+                sgdStepRule=optarg;
                 break;
             case 'm':
                 momentum=(double)atof(optarg);
@@ -89,8 +94,9 @@ int main(int argc, char **argv)
         std::cerr << "      -a STRING     algorithms: SGD, AGD, HYBRID [SGD]\n";
         std::cerr << "      -t INT        number of threads [1]\n";
         std::cerr << "      -c INT        number of output classes [4]\n";
-        std::cerr << "      -r REAL       step-size [1.0]\n";
-        std::cerr << "      -r REAL       Nesterov momentum [1.0]\n";
+        std::cerr << "      -r REAL       step-size [0.1]\n";
+        std::cerr << "      -d STRING     SGD step-size Rule [decreasing]\n";
+        std::cerr << "      -m REAL       Nesterov momentum [1.0]\n";
         std::cerr << "      -e INT        number of epochs [10]\n";
         std::cerr << "      -R INT        number of draws [1000]\n";
         std::cerr << "      -o STRING     output file prefix (Required)\n";
@@ -102,7 +108,7 @@ int main(int argc, char **argv)
     std::cerr << "Algorithm : " << alg << std::endl; 
     std::cerr << "number of threads : " << numThreads << std::endl;
     std::cerr << "number of output classes :" << numClass << std::endl;
-    std::cerr << "step-size : " << stepsize << std::endl;
+    std::cerr << "SGD step-size rule (if used) : " << sgdStepRule << std::endl;
     std::cerr << "acceleration momentum (if used) : " << momentum << std::endl;
     std::cerr << "number of epochs : " << maxEpoch << std::endl;
     std::cerr << "number of draws : " << R << std::endl;
@@ -120,10 +126,10 @@ int main(int argc, char **argv)
 	    gmxl1.fit_by_APG(stepsize, momentum, shrinkage, maxEpoch, optHistory, true);	
     } else if (alg == "SGD")
     {
-	    gmxl1.fit_by_SGD(stepsize, maxEpoch, optHistory,  true, false);        
+	    gmxl1.fit_by_SGD(stepsize, sgdStepRule, maxEpoch, optHistory,  true, false);        
     } else if (alg == "HYB" || alg == "HYBRID" || alg == "hybrid")
     {
-        gmxl1.fit_by_Hybrid(stepsize, stepsize, momentum, shrinkage, 
+        gmxl1.fit_by_Hybrid(stepsize, sgdStepRule, stepsize, momentum, shrinkage, 
             maxEpoch, optHistory, true);
     } else 
     {
@@ -132,7 +138,7 @@ int main(int argc, char **argv)
     }
 	
 	char outfilestr[200];
-    sprintf (outfilestr, "%s_%s_t%d_r%.1lf_m%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, stepsize, momentum, maxEpoch);
+    sprintf (outfilestr, "%s_%s_t%d_r%.1lf_%s_m%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
     std::cerr << "output file name: " << outfilestr << std::endl;
 	std::ofstream ofs(outfilestr);
     if (ofs.fail())
@@ -150,7 +156,7 @@ int main(int argc, char **argv)
 	ofs.close();
     ofs.clear();
 	char paramfile[200];
-    sprintf (paramfile, "%s_%s_t%d_r%.1lf_m%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, stepsize, momentum, maxEpoch);
+    sprintf (paramfile, "%s_%s_t%d_r%.1lf_%s_m%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
     ofs.open(paramfile);
     if (ofs.fail())
     {
