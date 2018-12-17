@@ -177,7 +177,7 @@ int main(int argc, char **argv)
     }  
     for(int k=0; k<cov.numClass; k++)
     {
-        for(int i=0; i<cov.dimension; i++)
+        for(int i=0; i<cov.factorArray[k].val.size(); i++)
             ofs << cov.factorArray[k].val[i]<< std::endl;
     }  	
 	ofs.close();	
