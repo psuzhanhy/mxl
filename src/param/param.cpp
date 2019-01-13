@@ -36,7 +36,7 @@ BlockCholeskey::BlockCholeskey(int numclass, int dim, bool zeroinit): LogisticPa
 				ctr[1] = j;	
         		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
 				double x = r123::uneg11<double>(unidrand[0]);
-				factorArray[i].val.push_back(0.5*(x+1.0));
+				factorArray[i].val.push_back(x);
 			}
 		}
 
@@ -235,7 +235,7 @@ ClassMeans::ClassMeans(int numclass, int dim, bool zeroinit): LogisticParam(numc
 				ctr[1] = j;	
         		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)
 				double x = r123::uneg11<double>(unidrand[0]);	
-				meanVectors[i].push_back(0.5*(x+1.0));
+				meanVectors[i].push_back(x);
 			}
 		}
 	} 

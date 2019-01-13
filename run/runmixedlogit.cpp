@@ -117,7 +117,7 @@ int main(int argc, char **argv)
     ReadDenseInput(input_filename, &data);   
 	CSR_matrix xf = Dense2CSR(data);
 	MxlGaussianBlockDiag gmxl1 = MxlGaussianBlockDiag(xf, data.label,
-						 numClass, xf.number_cols, true, 100);
+						 numClass, xf.number_cols, false, R);
    
 	OptHistory optHistory(maxEpoch); 
     

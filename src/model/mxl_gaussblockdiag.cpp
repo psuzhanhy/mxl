@@ -55,7 +55,7 @@ MxlGaussianBlockDiag::MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
         	ctr[0] = k;	
         	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
 			double x = r123::uneg11<double>(unidrand[0]);	
-			this->classConstants[k] = 0.5*(x+1.0);
+			this->classConstants[k] = x;
 		}
 	}
 } 
