@@ -16,8 +16,9 @@ class CommonUtility
 		typedef r123::Philox2x64 CBRNG;
 		static time_t time_start;
 		static int time_start_int;
-		static int numThreads;
+		static int numThreadsForIteration;
 		static int numSecondaryThreads;
+		static int numThreadsForSimulation;
 };
 
 #endif

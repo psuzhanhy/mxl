@@ -62,10 +62,11 @@ class MxlGaussianBlockDiag : public Logistic
 				const BlockCholeskey &covCholeskey,
 				int sampleID, 
 				const std::vector<double> &normalrv, 
-				std::vector<double> &simProb);
+				std::vector<double> &simProb,
+				int numThreadsForSimulation);
 
 		void gradient(int sampleID, std::vector<double> &constantGrad,
-				ClassMeans &meanGrad, BlockCholeskey &covGrad);
+				ClassMeans &meanGrad, BlockCholeskey &covGrad, int numThreadsForSimulation);
 
 		void fit_by_SGD(double stepsize, std::string stepsizeRule, int maxEpochs, 
 				OptHistory &history, bool writeHistory, bool adaptiveStop);

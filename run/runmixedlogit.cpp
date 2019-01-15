@@ -12,6 +12,7 @@
 #include "readinput.h"
 #include "opthistory.h"
 #include <getopt.h>
+#include <omp.h>
 
 int main(int argc, char **argv) 
 {
@@ -29,6 +30,8 @@ int main(int argc, char **argv)
     int numThreads=1;
     char *oPrefix=NULL;
 	double shrinkage = 0.5;
+    std::string parallelStrat("ParallelSim");
+    bool zeroInitialized = true;
 
     char hostname[100];
     gethostname (hostname, 100);
@@ -38,12 +41,14 @@ int main(int argc, char **argv)
     {
         {"Algorithm", required_argument, 0, 'a'},
         {"R", required_argument, 0, 'R'},
+        {"initialized to 0", required_argument, 0, 'z'},
         {"epochs", required_argument, 0, 'e'},
         {"step-size", required_argument, 0, 'r'},
         {"SGD step-size rule", optional_argument, 0, 'd'},
         {"momentum", optional_argument, 0, 'm'},
         {"classes", required_argument, 0, 'c'},
         {"nthreads", required_argument, 0, 't'},
+        {"parallelization strategy", optional_argument, 0, 'p'},
         {"oprefix", required_argument, 0, 'o'},
         {0, 0, 0, 0}
     };
@@ -51,7 +56,7 @@ int main(int argc, char **argv)
     while (1)
     {
         int option_index = 0;
-        c = getopt_long (argc, argv, "a:R:e:r:d:m:c:t:o:", long_options, &option_index);
+        c = getopt_long (argc, argv, "a:R:z:e:r:d:m:c:t:p:o:", long_options, &option_index);
         if (c==-1) break;
         switch (c)
         {
@@ -60,6 +65,9 @@ int main(int argc, char **argv)
                 break;
             case 'R':
                 R=atoi(optarg);
+                break;
+            case 'z':
+                zeroInitialized=(bool)atoi(optarg);
                 break;
             case 'e':
                 maxEpoch=atoi(optarg);
@@ -79,6 +87,9 @@ int main(int argc, char **argv)
             case 't':
                 numThreads=(int)atoi(optarg);
                 break;
+            case 'p':
+                parallelStrat=optarg;
+                break;
             case 'o':
                 oPrefix = optarg;
                 break;
@@ -92,7 +103,9 @@ int main(int argc, char **argv)
         std::cerr << "Usage: ./runmixedlogit <inputfilename> [option] [value] \n";
         std::cerr << "Options:\n\n";
         std::cerr << "      -a STRING     algorithms: SGD, AGD, HYBRID [SGD]\n";
+        std::cerr << "      -z BOOL       used 0 for initializing guess [1]\n";
         std::cerr << "      -t INT        number of threads [1]\n";
+        std::cerr << "      -p INT        parallelization strategy [ParallelSim]\n";
         std::cerr << "      -c INT        number of output classes [4]\n";
         std::cerr << "      -r REAL       step-size [0.1]\n";
         std::cerr << "      -d STRING     SGD step-size Rule [decreasing]\n";
@@ -104,20 +117,27 @@ int main(int argc, char **argv)
     }
 
     input_filename = argv[optind];
-    std::cerr << "Training settings...\n";
+    std::cerr << "Optimization settings...\n";
     std::cerr << "Algorithm : " << alg << std::endl; 
+    std::cerr << "initialized to 0: " << zeroInitialized << std::endl;
     std::cerr << "number of threads : " << numThreads << std::endl;
+    std::cerr << "prallelization strategy : " << parallelStrat << std::endl;
     std::cerr << "number of output classes :" << numClass << std::endl;
     std::cerr << "SGD step-size rule (if used) : " << sgdStepRule << std::endl;
     std::cerr << "acceleration momentum (if used) : " << momentum << std::endl;
     std::cerr << "number of epochs : " << maxEpoch << std::endl;
     std::cerr << "number of draws : " << R << std::endl;
 
-    CommonUtility::numThreads = numThreads;
+    if (parallelStrat == "ParallelIter")
+    {
+        CommonUtility::numThreadsForIteration = numThreads;        
+    } else {
+        CommonUtility::numThreadsForSimulation = numThreads;        
+    }
     ReadDenseInput(input_filename, &data);   
 	CSR_matrix xf = Dense2CSR(data);
 	MxlGaussianBlockDiag gmxl1 = MxlGaussianBlockDiag(xf, data.label,
-						 numClass, xf.number_cols, false, R);
+						 numClass, xf.number_cols, zeroInitialized, R);
    
 	OptHistory optHistory(maxEpoch); 
     
@@ -138,7 +158,11 @@ int main(int argc, char **argv)
     }
 	
 	char outfilestr[200];
-    sprintf (outfilestr, "%s_%s_t%d_r%.1lf_%s_m%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+    if (zeroInitialized){
+        sprintf(outfilestr, "%s_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+    } else {
+        sprintf(outfilestr, "_randominit_%s_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+    }
     std::cerr << "output file name: " << outfilestr << std::endl;
 	std::ofstream ofs(outfilestr);
     if (ofs.fail())
@@ -156,7 +180,13 @@ int main(int argc, char **argv)
 	ofs.close();
     ofs.clear();
 	char paramfile[200];
-    sprintf (paramfile, "%s_%s_t%d_r%.1lf_%s_m%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+    if (zeroInitialized)
+    {
+        sprintf(paramfile, "%s_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+    } else {
+        sprintf(paramfile, "_randominit_%s_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+    }
+    
     ofs.open(paramfile);
     if (ofs.fail())
     {

@@ -1,13 +1,16 @@
 CXX = g++-7
 CXXFLAGS = -std=c++11 -fopenmp -O3 -flto -I src/utility/ -I src/model/ -I src/opt/ -I src/param/ -I Random123/include/ -I Random123/examples/
 
-all: runlogit runmixedlogit testlr_SGD testlr_HGD testlr_AGD testmxl 
+all: runlogit runmixedlogit functionevaltime testlr_SGD testlr_HGD testlr_AGD testmxl 
 
 runlogit: run/runlogit.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
 	$(CXX) $(CXXFLAGS) -o runlogit run/runlogit.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
 
 runmixedlogit: run/runmixedlogit.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o
 	$(CXX) $(CXXFLAGS) -o runmixedlogit run/runmixedlogit.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o
+
+functionevaltime: run/functionevaltime.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o
+	$(CXX) $(CXXFLAGS) -o functionevaltime run/functionevaltime.cpp src/param/matvec.o src/param/param.o src/model/mxl_gaussblockdiag.o src/utility/readinput.o src/utility/common.o
 
 testlr_SGD: testing/test_logistic_regression_SGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o
 	$(CXX) $(CXXFLAGS) -o testLR_StochasticGD testing/test_logistic_regression_SGD.cpp src/param/matvec.o src/param/param.o src/model/logistic_regression.o src/utility/readinput.o src/utility/common.o

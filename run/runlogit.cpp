@@ -29,6 +29,7 @@ int main(int argc, char **argv)
     char *oPrefix=NULL;
 	double shrinkageAGD = 0.5;
     int batchSize = 1;
+    bool zeroInitialized = true;
 
     char hostname[100];
     gethostname (hostname, 100);
@@ -37,6 +38,7 @@ int main(int argc, char **argv)
     static struct option long_options[] =
     {
         {"Algorithm", required_argument, 0, 'a'},
+        {"initialized to 0", required_argument, 0, 'z'},
         {"epochs", required_argument, 0, 'e'},
         {"initial SGD step-size", optional_argument, 0, 'r'},
         {"AGD step-size", optional_argument, 0, 's'},
@@ -50,12 +52,15 @@ int main(int argc, char **argv)
     while (1)
     {
         int option_index = 0;
-        c = getopt_long (argc, argv, "a:e:r:s:d:c:t:o:", long_options, &option_index);
+        c = getopt_long (argc, argv, "a:z:e:r:s:d:c:t:o:", long_options, &option_index);
         if (c==-1) break;
         switch (c)
         {
             case 'a':
                 alg=optarg;
+                break;
+            case 'z':
+                zeroInitialized=(bool)atoi(optarg);
                 break;
             case 'e':
                 maxEpoch=atoi(optarg);
@@ -88,6 +93,7 @@ int main(int argc, char **argv)
         std::cerr << "Usage: ./runmixedlogit <inputfilename> [option] [value] \n";
         std::cerr << "Options:\n\n";
         std::cerr << "      -a STRING     algorithms: SGD, AGD, HYBRID [SGD]\n";
+        std::cerr << "      -z BOOL       used 0 for initializing guess [1]\n";
         std::cerr << "      -t INT        number of threads [1]\n";
         std::cerr << "      -c INT        number of output classes [4]\n";
         std::cerr << "      -r REAL       initial SGD step-size [0.1]\n";
@@ -99,8 +105,9 @@ int main(int argc, char **argv)
     }
 
     input_filename = argv[optind];
-    std::cerr << "Training settings...\n";
-    std::cerr << "Algorithm : " << alg << std::endl; 
+    std::cerr << "Optimization settings...\n";
+    std::cerr << "Algorithm : " << alg << std::endl;
+    std::cerr << "initialized to 0: " << zeroInitialized << std::endl;
     std::cerr << "number of threads : " << numThreads << std::endl;
     std::cerr << "number of output classes :" << numClass << std::endl;
     std::cerr << "SGD step-size (if used): " << stepSizeSGD << std::endl;
@@ -108,7 +115,7 @@ int main(int argc, char **argv)
     std::cerr << "AGD step-size (if used): " << stepSizeAGD << std::endl;
     std::cerr << "number of epochs : " << maxEpoch << std::endl;
 
-    CommonUtility::numThreads = numThreads;
+    CommonUtility::numThreadsForIteration = numThreads;
     ReadDenseInput(input_filename, &data);   
 	CSR_matrix xf = Dense2CSR(data);
 	int p=xf.number_cols;
@@ -116,8 +123,9 @@ int main(int argc, char **argv)
 	double l1Lambda = 0.0;
 	double l2Lambda = 0.0;
 
-	LogisticRegression lr = LogisticRegression(xf, data.label, 
-            numClass, p, l1Lambda, l2Lambda, true);
+    LogisticRegression lr = LogisticRegression(xf, data.label, 
+                numClass, p, l1Lambda, l2Lambda, zeroInitialized);
+ 
 
 	OptHistory optHistory(maxEpoch); 
     

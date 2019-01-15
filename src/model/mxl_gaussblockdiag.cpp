@@ -130,7 +130,8 @@ void MxlGaussianBlockDiag::simulatedProbability(
 		const BlockCholeskey &covCholeskey,
 		int sampleID, 
 		const std::vector<double> &normalrv, 
-		std::vector<double> &simProb)
+		std::vector<double> &simProb,
+		int numThreadsForSimulation)
 {
 	/*
 	*	return a vector of length (R * numClass) of the 
@@ -145,6 +146,7 @@ void MxlGaussianBlockDiag::simulatedProbability(
 	this->propensityFunction(classConstants, means, covCholeskey,
 			sampleID, normalrv, propensityScore); 	
 
+    #pragma omp parallel for num_threads(numThreadsForSimulation) schedule(static) shared(simProb,propensityScore)
  	for(int r=0; r<this->R; r++)
 	{
 		double maxscore = propensityScore[r*this->numClass];
@@ -204,7 +206,7 @@ double MxlGaussianBlockDiag::negativeLogLik(
 		std::vector<double> probSim(this->R * this->numClass);
 		//populate probSim 
 		this->simulatedProbability(classConstants, means, 
-				covCholeskey, n,normalrv, probSim);
+				covCholeskey, n,normalrv, probSim, 1);
  
 		int lbl = this->label[n];
 		double probSAA = 0;
@@ -224,7 +226,7 @@ double MxlGaussianBlockDiag::objValue(
 {
 	double objvalue = 0.0;
 	objvalue += this->negativeLogLik(classConstants, means, 
-		covCholeskey, CommonUtility::numSecondaryThreads);
+		covCholeskey, numThreads);
 	objvalue /= this->numSamples;
 	return objvalue;
 }
@@ -233,7 +235,8 @@ double MxlGaussianBlockDiag::objValue(
 void MxlGaussianBlockDiag::gradient(int sampleID, 
 		std::vector<double> &constantGrad,
 		ClassMeans &meanGrad, 
-		BlockCholeskey &covGrad)
+		BlockCholeskey &covGrad,
+		int numThreadsForSimulation)
 {
 	/* gradient of 1/n sum f_n(theta), where f_n is the SAA objective */
 	// generate normal(0,1) vector
@@ -261,7 +264,7 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 	std::vector<double> probSim(this->R * this->numClass);
 	//populate probSim 
 	this->simulatedProbability(this->classConstants, this->means, 
-			this->covCholeskey, sampleID,normalrv, probSim);
+			this->covCholeskey, sampleID,normalrv, probSim, numThreadsForSimulation);
 	// Sample Average Approximated Probability
 	int lbl = this->label[sampleID];
 	double probSAA = 0;
@@ -351,7 +354,7 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize, std::string stepsizeRule,
 		ClassMeans meanGradOld(this->means);
 		BlockCholeskey covGradOld(this->covCholeskey);
 		std::vector<double> constantGradOld(this->classConstants);
-		#pragma omp parallel num_threads(CommonUtility::numThreads)\
+		#pragma omp parallel num_threads(CommonUtility::numThreadsForIteration)\
 		firstprivate(meanGrad,covGrad,constantGrad, meanGradOld, covGradOld, constantGradOld) 
 		{
         int nThreads = omp_get_num_threads();	
@@ -380,7 +383,7 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize, std::string stepsizeRule,
 			covGrad.setzero();
 			meanGrad.setzero();
 
-			this->gradient(ordering[n],constantGrad, meanGrad, covGrad);
+			this->gradient(ordering[n],constantGrad, meanGrad, covGrad, CommonUtility::numThreadsForSimulation);
 			// update mean
 			meanGrad *= learningRate;
 			this->means -= meanGrad;
@@ -478,9 +481,9 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 		std::fill(constantGrad.begin(), constantGrad.end(), 0.0);
 		covGrad.setzero();
 		meanGrad.setzero();
-		#pragma omp parallel for num_threads(CommonUtility::numThreads) 
+		#pragma omp parallel for num_threads(CommonUtility::numThreadsForIteration) 
 		for(int n=0; n<this->numSamples; n++)
-			this->gradient(n,constantGrad, meanGrad, covGrad);
+			this->gradient(n,constantGrad, meanGrad, covGrad, CommonUtility::numThreadsForSimulation);
 
 		for(int k=0; k<this->numClass; k++)
 			constantGrad[k] /= this->numSamples;
@@ -518,9 +521,9 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 		cov_v = cov_x_new + (cov_x_new - cov_x) * momentum;
 		//compare NLL
 		double obj_x = this->objValue(classConstants_x_new, mean_x_new, 
-				cov_x_new, CommonUtility::numThreads);	
+				cov_x_new, CommonUtility::numThreadsForIteration);	
 		double obj_v = this->objValue(classConstants_v, mean_v, 
-				cov_v, CommonUtility::numThreads);
+				cov_v, CommonUtility::numThreadsForIteration);
     	gettimeofday(&finish,nullptr) ; // set timer finish    
 		if (writeHistory)
 		{  
@@ -635,7 +638,7 @@ double MxlGaussianBlockDiag::gradNormSq(ClassMeans &meanGrad,
 	meanGrad.setzero();
 	#pragma omp parallel for num_threads(numThreads) 
 	for(int n=0; n<this->numSamples; n++)
-		this->gradient(n,constantGrad, meanGrad, covGrad);
+		this->gradient(n,constantGrad, meanGrad, covGrad, 1);
 	
 	for(int k=0; k<this->numClass; k++)
 		constantGrad[k] *= (1.0/this->numSamples);
@@ -682,7 +685,7 @@ std::vector<int> MxlGaussianBlockDiag::insamplePrediction(const std::vector<doub
 		std::vector<double> probSim(this->R * this->numClass);
 		//populate probSim 
 		this->simulatedProbability(constants1, mean1, 
-				cov1, n,normalrv, probSim);
+				cov1, n,normalrv, probSim, 1);
  
 		std::vector<double> probSAA(this->numClass,0.0);
 		for(int r=0; r<this->R; r++)
