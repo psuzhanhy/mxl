@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include "common.h"
+#include <boost/random/normal_distribution.hpp>
+#include <boost/random.hpp>
 
 //program start time as seed
 time_t CommonUtility::time_start = time(nullptr);

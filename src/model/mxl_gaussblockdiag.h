@@ -24,6 +24,7 @@ class MxlGaussianBlockDiag : public Logistic
 
 
 	public:
+		
 		MxlGaussianBlockDiag(CSR_matrix xf, std::vector<int> lbl,
 				int numclass, int dim, bool zeroinit,int numdraws);
 

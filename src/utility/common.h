@@ -7,7 +7,8 @@
 #include <sys/time.h>
 #include <Random123/threefry.h>
 #include <Random123/philox.h>
-
+#include <boost/random/normal_distribution.hpp>
+#include <boost/random.hpp>
 
 class CommonUtility
 {

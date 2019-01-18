@@ -10,6 +10,7 @@
 #include <Random123/philox.h>
 #include "uniform.hpp"
 #include "boxmuller.hpp"
+#include <boost/random/normal_distribution.hpp>
 #include "matvec.h"
 #include "param.h"
 #include "logistic.h"
@@ -82,6 +83,7 @@ void MxlGaussianBlockDiag::propensityFunction(const std::vector<double> &classCo
 		meanPropensity[k] = this->xfeature.rowInnerProduct(means.meanVectors[k],
 					means.dimension, sampleID);
 
+    #pragma omp parallel for num_threads(CommonUtility::numThreadsForSimulation) schedule(static) shared(meanPropensity)
 	for(int r=0; r<this->R; r++)
 	{
 		for(int k=0; k<this->numClass; k++)
@@ -175,34 +177,26 @@ double MxlGaussianBlockDiag::negativeLogLik(
 	    const ClassMeans &means,
 		const BlockCholeskey &covCholeskey, int numThreads) 
 {
+	
 	double nll = 0;
 	#pragma omp parallel num_threads(numThreads)
 	{
 	int rvdim = this->numClass * this->R * this->dimension;
 	//normal(0,1) draws for sampleID
-	std::vector<double> normalrv(rvdim);
+	std::vector<double> normalrv(rvdim,0.0);
+	boost::mt19937 rng(CommonUtility::time_start);
+	boost::normal_distribution<> nd(0.0, 1);
+	boost::variate_generator<boost::mt19937&,  boost::normal_distribution<> > var_nor(rng, nd);
 
-	CommonUtility::CBRNG g;
-	CommonUtility::CBRNG::ctr_type ctr = {{}};
-    CommonUtility::CBRNG::key_type key = {{}};	
-	key[0] = CommonUtility::time_start_int;//seed	
 	#pragma omp for reduction(+:nll) 
 	for(int n=0; n<this->numSamples; n++)
-	{
-		ctr[0] = n;		
-		for(int i=0; i<rvdim/2; i++)
-		{
-			ctr[1] = i;
-        	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
-			auto nr = r123::boxmuller(unidrand[0], unidrand[1]);	
-			normalrv[2*i] = nr.x;
-			normalrv[2*i+1] = nr.y;			
-		}
-		ctr[1] = rvdim/2;
-        CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
-		auto nr = r123::boxmuller(unidrand[0], unidrand[1]);
-		normalrv[rvdim-1] = nr.x;
-	
+	{	
+		double seed = n + CommonUtility::time_start;
+		var_nor.engine().seed(seed);
+    	var_nor.distribution().reset();
+		for(int i=0; i<rvdim; i++)
+			normalrv[i] = var_nor();
+
 		std::vector<double> probSim(this->R * this->numClass);
 		//populate probSim 
 		this->simulatedProbability(classConstants, means, 
@@ -240,27 +234,20 @@ void MxlGaussianBlockDiag::gradient(int sampleID,
 {
 	/* gradient of 1/n sum f_n(theta), where f_n is the SAA objective */
 	// generate normal(0,1) vector
-	CommonUtility::CBRNG g;
-	CommonUtility::CBRNG::ctr_type ctr = {{}};
-    CommonUtility::CBRNG::key_type key = {{}};	
-	key[0] = CommonUtility::time_start_int;//seed	
-	ctr[0] = sampleID;
-	int rvdim = this->numClass * this->R * this->dimension; 
-	std::vector<double> normalrv(rvdim);
-	// all random draws for sampleID
-	for(int i=0; i<rvdim/2; i++)
-	{
-		ctr[1] = i;
-		CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
-		auto nr = r123::boxmuller(unidrand[0], unidrand[1]);	
-		normalrv[2*i] = nr.x;
-		normalrv[2*i+1] = nr.y;			
-	}
-	ctr[1] = rvdim/2;
-	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
-	auto nr = r123::boxmuller(unidrand[0], unidrand[1]);
-	normalrv[rvdim-1] = nr.x;
 
+	int rvdim = this->numClass * this->R * this->dimension; 
+	std::vector<double> normalrv(rvdim,0.0);
+
+	boost::mt19937 rng(CommonUtility::time_start);
+	boost::normal_distribution<> nd(0.0, 1);
+	boost::variate_generator<boost::mt19937&,  boost::normal_distribution<> > var_nor(rng, nd);
+	// all random draws for sampleID
+	double seed = sampleID + CommonUtility::time_start;
+	var_nor.engine().seed(seed);
+    var_nor.distribution().reset();
+	for(int i=0; i<rvdim; i++)
+		normalrv[i] = var_nor();
+	
 	std::vector<double> probSim(this->R * this->numClass);
 	//populate probSim 
 	this->simulatedProbability(this->classConstants, this->means, 
@@ -333,7 +320,7 @@ void MxlGaussianBlockDiag::fit_by_SGD(double stepsize, std::string stepsizeRule,
 	CommonUtility::CBRNG g;
 	CommonUtility::CBRNG::ctr_type ctr = {{}};
     CommonUtility::CBRNG::key_type key = {{}};	
-	key[0] = CommonUtility::time_start_int;//seed	
+	key[0] = CommonUtility::time_start_int;//seed
 	if(writeHistory)
 	{
 		history.iterTime.push_back(0.0);
@@ -460,11 +447,6 @@ void MxlGaussianBlockDiag::fit_by_APG(double stepsize, double momentum,
 	ClassMeans mean_v(this->means);
 	BlockCholeskey cov_v(this->covCholeskey);
 	std::vector<double> classConstants_v(this->classConstants);
-
-	CommonUtility::CBRNG g;
-	CommonUtility::CBRNG::ctr_type ctr = {{}};
-    CommonUtility::CBRNG::key_type key = {{}};	
-	key[0] = CommonUtility::time_start_int;//seed	
 
 	if(writeHistory)
 	{
@@ -660,28 +642,20 @@ std::vector<int> MxlGaussianBlockDiag::insamplePrediction(const std::vector<doub
 	int rvdim = this->numClass * this->R * this->dimension;
 	//normal(0,1) draws for sampleID
 	std::vector<double> normalrv(rvdim);
+	// private rand generators 
+	boost::mt19937 rng(CommonUtility::time_start);
+	boost::normal_distribution<> nd(0.0, 1);
+	boost::variate_generator<boost::mt19937&,  boost::normal_distribution<> > var_nor(rng, nd);
 
-	CommonUtility::CBRNG g;
-	CommonUtility::CBRNG::ctr_type ctr = {{}};
-    CommonUtility::CBRNG::key_type key = {{}};	
-	key[0] = CommonUtility::time_start_int;//seed	
 	#pragma omp for  
 	for(int n=0; n<this->numSamples; n++)
 	{
-		ctr[0] = n;		
-		for(int i=0; i<rvdim/2; i++)
-		{
-			ctr[1] = i;
-        	CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
-			auto nr = r123::boxmuller(unidrand[0], unidrand[1]);	
-			normalrv[2*i] = nr.x;
-			normalrv[2*i+1] = nr.y;			
-		}
-		ctr[1] = rvdim/2;
-        CommonUtility::CBRNG::ctr_type unidrand = g(ctr, key); //unif(-1,1)	
-		auto nr = r123::boxmuller(unidrand[0], unidrand[1]);
-		normalrv[rvdim-1] = nr.x;
-	
+		double seed = n + CommonUtility::time_start;
+		var_nor.engine().seed(seed);
+		var_nor.distribution().reset();
+		for(int i=0; i<rvdim; i++)
+			normalrv[i] = var_nor();		
+		
 		std::vector<double> probSim(this->R * this->numClass);
 		//populate probSim 
 		this->simulatedProbability(constants1, mean1, 
