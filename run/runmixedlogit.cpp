@@ -159,9 +159,9 @@ int main(int argc, char **argv)
 	
 	char outfilestr[200];
     if (zeroInitialized){
-        sprintf(outfilestr, "%s_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+        sprintf(outfilestr, "%s_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d_R%d.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch, R);
     } else {
-        sprintf(outfilestr, "%s_randominit_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+        sprintf(outfilestr, "%s_randominit_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d_R%d.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch, R);
     }
     std::cerr << "output file name: " << outfilestr << std::endl;
 	std::ofstream ofs(outfilestr);
@@ -182,9 +182,9 @@ int main(int argc, char **argv)
 	char paramfile[200];
     if (zeroInitialized)
     {
-        sprintf(paramfile, "%s_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+        sprintf(paramfile, "%s_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d_R%d_param.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch, R);
     } else {
-        sprintf(paramfile, "%s_randominit_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d_param.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch);
+        sprintf(paramfile, "%s_randominit_%s_t%d_p%s_r%.1lf_%s_m%.1lf_e%d_R%d_param.txt", oPrefix, alg.c_str(), numThreads, parallelStrat.c_str(), stepsize, sgdStepRule.c_str(), momentum, maxEpoch, R);
     }
 
     ofs.open(paramfile);
